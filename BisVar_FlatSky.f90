@@ -8,25 +8,82 @@ program FlatSky
 
   real(dl), pointer :: Cl(:,:), Cll(:,:)
   real(dl), pointer :: pClpp(:,:)
-  integer :: l1, l2a, l3a, l2b, l3b, idphi23, idphi23b
-  integer :: lmax, lmin, Iphimax
-  real(dl) :: phimina, phiminb, phimaxa, phimaxb, dphia, dphib 
+  integer :: l1, l2a, l3a, l2b, l3b
+  integer :: l3blmin, l3blmax,l1almax,l1almin, l1a,l1b
+  integer :: lmax, lmin
   integer :: i,j
   real(dl) :: phi23a, phi23b, phi31a, phi31b, phi21a, phi21b, phi2a3b, phi2b3a, phi2a2b, phi3a3b
   real(dl) :: fnl, signsq
-  real(dl) :: absl1a, absl1b, absl2l3a, absl2l3b, absl3al3b, absl2al2b, absl2al3b, absl2bl3a
+  real(dl) :: absl2l3a, absl2l3b, absl3al3b, absl2al2b, absl2al3b, absl2bl3a
   real(dl) :: l2dotl3a, l2dotl3b, l2adotl3b,l2bdotl3a,l3adotl3b,l2adotl2b
-  real(dl) :: DB(12)
+  real(dl) :: DB(3)
   real(dl) :: SumGauss, DSNGauss,  SumNGauss, DSNonGauss
   real(dl) :: CMB2COBEnorm = 7428350250000.d0
 
+  integer :: ellar(512), dellar(512), elltoi(5000)
+  integer :: intmax, imin
 
+
+
+  !various binning schemes
+!!$  do i  = 1, 256
+!!$     if (i .le. 19) then
+!!$        ellar(i) = i+1
+!!$        dellar(i) = 1.d0
+!!$     elseif (i .le. 75 .and. i .ge. 20) then 
+!!$        ellar(i) = ellar(i-1) + 4
+!!$        dellar(i) = 4.d0
+!!$     elseif (i .le. 257 .and. i .ge. 76) then
+!!$        ellar(i)  = ellar(i-1) + 20
+!!$        dellar(i) = 20.d0
+!!$     endif
+!!$     !write(*,*) 'ell:', ellar(i)
+!!$  enddo
+  do i  = 1, 256
+     if (i .le. 47) then
+        ellar(i) = i+1
+        dellar(i) = 1.d0
+        elltoi(ellar(i)) = i
+     elseif (i .le. 85 .and. i .ge. 48) then 
+        ellar(i) = ellar(i-1) + 4
+        dellar(i) = 4.d0
+        elltoi(ellar(i)) = i
+
+     elseif (i .le. 110 .and. i .ge. 86) then
+        ellar(i)  = ellar(i-1) + 12
+        dellar(i) = 12.d0
+        elltoi(ellar(i)) = i
+
+     elseif (i .le. 175 .and. i .ge. 111) then
+        ellar(i)  = ellar(i-1) + 24
+        dellar(i) = 24.d0
+        elltoi(ellar(i)) = i
+
+     else
+        ellar(i)  = ellar(i-1) + 50
+        dellar(i) = 50.d0
+        elltoi(ellar(i)) = i
+
+     endif
+     !write(*,*) 'ell:', ellar(i)
+  enddo
+!!$  do i  = 1, 512
+!!$     if (i .le. 399) then
+!!$        ellar(i) = i + 1
+!!$        dellar(i) = 1.d0
+!!$     else
+!!$        ellar(i)  = ellar(i-1) + 2
+!!$        dellar(i) = 2.d0
+!!$     endif
+!!$     !write(*,*) 'ell:', ellar(i)
+!!$  enddo
+  !stop
+  !∆`=  1  for`≤50,  ∆`=  4  for50< `≤200,  ∆`=  12  for  200< `≤500,  ∆`=  24for 500< `≤2000,  and finally ∆`= 40 for` >2000   
 
   lmax = 5000
 
   lmin = 2
 
-  Iphimax = 10
   allocate(Cl(4,2:lmax))
   allocate(Cll(4,2:lmax))
   allocate(pClpp(3,2:lmax))
@@ -63,103 +120,107 @@ program FlatSky
   SumNGauss = 0.d0
   DB = 0.d0
   !structure
-  !l2/l3/l2'/l3'/dphi23'
-  lmax = 500
-  lmin = 40
+  !l2/l3/l3/l2'/l3'
+  lmax = 400
+  lmin = 2
 
-  !$OMP PARALLEL DO DEFAUlT(SHARED),SCHEDULE(dynamic) &
-  !$OMP PRIVATE(l2a,l3a,l2b,l3b,idphi23,phimina,phimaxa,dphia), &
-  !$OMP PRIVATE(fnl,phi23a,phi23b,signsq,phi21a,phi31a,phi21b,phi31b,phi2a3b,phi2b3a), &
-  !$OMP PRIVATE(phi2a2b,phi3a3b,l2dotl3a,l2dotl3b,l2adotl3b,l2bdotl3a,l3adotl3b,l2adotl2b), &
-  !$OMP PRIVATE(absl1a,absl1b,absl2l3a,absl2l3b,absl2al2b,absl3al3b,DB,DSNonGauss,DSNGauss), &
-  !$OMP REDUCTION(+:SumGauss,SumNGauss)
-  
-  do l2a = lmin, lmax !l2 loop
-     write(*,*) 'l2 = ', l2a
-     do l3a = lmin, lmax !l3 loop
+  intmax = 128
+  imin = 9
+  lmax = ellar(intmax)
+  lmin = ellar(imin)
 
-        !since lmin (lmax) = 10 (or 2, or whatever)
-        !for a doublet (l2,l3) there exists a phimin (phimax)
-        phimina = exphi(max(lmin,abs(l2a-l3a)),l2a,l3a)
-        phimaxa = exphi(min(lmax,l2a+l3a),l2a,l3a)
+  write(*,*) 'lmax:',lmax
+  write(*,*) 'lmin:',lmin
 
-        !stepsize  
-        dphia = (phimaxa-phimina)/iphimax
-        !write(*,*) l3a, phimina, phimaxa, dphia  !iphi_maxa
 
-        !set value of phi23a 
-        phi23a = phimina - dphia
-        do idphi23 = 1, Iphimax !angle between l2 and l3 loop
 
-           !add step to phi23
-           phi23a = phi23a + dphia
+  do i = imin, intmax !l2 loop
+     l2a = ellar(i)
+     
+     !$OMP PARALLEL DO DEFAUlT(SHARED),SCHEDULE(dynamic) &
+     !$OMP PRIVATE(l1a,l1b,l3a,l2b,l3b,l1almax,l1almin,l3blmin,l3blmax,j), &
+     !$OMP PRIVATE(fnl,phi23a,phi23b,signsq,phi21a,phi31a,phi21b,phi31b,phi2a3b,phi2b3a), &
+     !$OMP PRIVATE(phi2a2b,phi3a3b,l2dotl3a,l2dotl3b,l2adotl3b,l2bdotl3a,l3adotl3b,l2adotl2b), &
+     !$OMP PRIVATE(absl2al3b,absl2al2b,absl3al3b,absl2bl3a,DB,DSNonGauss,DSNGauss), &
+     !$OMP REDUCTION(+:SumGauss,SumNGauss)
+     do j = imin, intmax !l3 loop
+        l3a = ellar(j)
+        !set minimum and max values of third leg (triangle constraint)
+        l1almax = min(l2a+l3a,lmax)
+        l1almin = max(abs(l2a-l3a),lmin)
 
-           !Set value of l1. Note that this a real;
-           !we will later convert this to an integer when we call the bispectrum
-           absl1a = length(l2a,l3a,phi23a)
-           
-           !write(*,*) absl1a, phi23a
+        do l1a = l1almin, l1almax
+
+           !angle between l2 and l3
+           phi23a = angle(l2a,l3a,l1a)
+           !inner products:
+           l2dotl3a = l2a*l3a*cos(phi23a) !l2.l3
+           !other angles; needed for 11 permutations 
+           phi21a = angle(l1a,l2a,l3a)
+           phi31a = pi - phi23a - phi21a
+
            !get the SW bispectrum for the triplet (l1, l2 ,l3)
-           fnl = floc(nint(absl1a), l2a,l3a)
-           
-           do l2b = lmin, lmax !l2' loop
+           fnl = floc(l1a, l2a,l3a)
 
-              !Eauate the l1 and l1'
-              !l1 = l1':
-              absl1b = absl1a
+           !Eauate the l1 and l1'
+           l1b = l1a
+           !l2b can max be size of l1 (or l1'). Can be small, given l3
+           !il2max =
+           do l2b = lmin, l1a
+              !do k = imin, l1a !l2' loop
+              !l2b = ellar(k)
+              !minimum value is contraint to
+              l3blmin = max(abs(l1b-l2b),lmin)
+              !maximum:
+              l3blmax = min(l1b+l2b,lmax)
 
-              do l3b = lmin, lmax !final loop: l3'
-                 
-                 !l1 = l1', sets another constraint equation:
-                 phi23b = exphi(nint(absl1b),l2b,l3b)
+              do l3b = l3blmin, l3blmax !final loop: l3'
 
+                 !prime triangle angle between l2' and l3'
+                 phi23b = angle(l2b,l3b,l1b)
                  !compute fnl^2
-                 signsq = fnl*floc(nint(absl1b), l2b,l3b)
+                 signsq = fnl*floc(l1b,l2b,l3b)
 
                  !other angles; needed for 11 permutations 
-                 phi21a = angle(l2a,l3a,absl1a,phi23a)
-                 phi31a = pi - phi23a - phi21a
-
-                 phi21b = angle(l2b,l3b,absl1b,phi23b)
-                 !write(*,*) l2b, l3b, phi23b, phi21b
+                 phi21b = angle(l1b,l2b,l3b)
                  phi31b = pi - phi23b - phi21b
 
-                 phi2a3b = phi21a + phi31b
-                 phi2b3a = phi21b + phi31a
+                 phi2a3b = abs(phi21a + phi31b) !correct direction
+                 phi2b3a = abs(phi21b + phi31a)
 
-                 phi2a2b = phi21a+phi21b
-                 phi3a3b = phi31a+phi31b
+                 phi2a2b = pi- phi21a - phi21b
+                 phi3a3b = pi- phi31a - phi31b
 
-                 !inner products:
-                 l2dotl3a = l2a*l3a*cos(phi23a)
-                 l2dotl3b = l2b*l3b*cos(phi23b)
+                 !other inner products:
+                 l2dotl3b = l2b*l3b*cos(phi23b) !l2'.l3'
 
-                 l2adotl3b = l2a*l3b*cos(phi2a3b)
-                 l2bdotl3a = l2b*l3a*cos(phi2b3a)
+                 l2adotl3b = l2a*l3b*cos(phi2a3b) !l2.l3'
+                 l2bdotl3a = l2b*l3a*cos(phi2b3a) !l2'.l3
 
-                 l3adotl3b = l3a*l3b*cos(phi3a3b)
-                 l2adotl2b = l2a*l2b*cos(phi2a2b)
+                 l3adotl3b = l3a*l3b*cos(phi3a3b) !l3.l3'
+                 l2adotl2b = l2a*l2b*cos(phi2a2b) !l2.l2'
 
                  !other lengths:
-                 absl2l3a = nint(length(l2a,l3a,phi23a)) !|l2+l3|
-                 absl2l3b = nint(length(l2b,l3b,phi23b)) !|l2'+l3'|
+                 absl2al2b = nint(length(l2a,l2b,phi2a2b)) !|l2+l2'|
+                 absl3al3b = nint(length(l3a,l3b,phi3a3b)) !|l3+l3'|
 
-                 absl2al2b = nint(length(l2a,l2b,phi2a2b)) !l2+l2'|
-                 absl3al3b = nint(length(l3a,l3b,phi3a3b)) !|l3+l3'|  
+                 absl2al3b = nint(length(l2a,l3b,phi2a3b)) !|l2+l3'|
+                 absl2bl3a = nint(length(l2b,l3a,phi2b3a)) !|l2'+l3|
 
+                 !3 unique terms 
+                 DB(1) = 4.d0*( Cl(1,l1a)*Cl(1,l2a)*Cl(1,l2b)*pClpp(1,l1a)* &
+                      (l2a**2+l2dotl3a)*(l2b**2+l2dotl3b))
+                 DB(2) = 4.d0*( Cl(1,l1a)*Cl(1,l2a)*Cl(1,l2b)*pClpp(1,absl2bl3a)* &
+                      (l2a**2+l2adotl3b)*(l2b**2+l2bdotl3a))
+                 DB(3) = 4.d0*( Cl(1,l1a)*Cl(1,l2b)*Cl(1,l3b)*pClpp(1,absl2al2b)* &
+                      (l3b**2+l3adotl3b)*(l2b**2+l2adotl2b))                 
 
-                 DB(1) = Cl(1,nint(absl1a))*Cl(1,l2a)*Cl(1,l2b)*pClpp(1,nint(absl2l3a))* &
-                      (l2a**2+l2dotl3a+l2adotl2b+l2bdotl3a) !+ perm (11)
-                 !write(*,*)  l2a, l2b, l3a, l3b,l2dotl3a,l2adotl2b,l2bdotl3a
-                 if (phi21b .ne. phi21b) write(*,*) l2b, l3b, absl1a
-                 DSNonGauss = 9.d0*signsq*Sum(DB)/36./Cl(1,nint(absl1a))**2/Cl(1,l2a)/Cl(1,l2b)/Cl(1,l3a)/Cl(1,l3b)
-                 !write(*,*) DSNonGauss
+                 if (phi21b .ne. phi21b) write(*,*) l2b, l3b, l1b
+                 DSNonGauss = 9.d0*signsq*Sum(DB(1:2))/36./Cl(1,l1a)**2/Cl(1,l2a)/Cl(1,l2b)/Cl(1,l3a)/Cl(1,l3b)
 
-                 if ((l2A.eq.l2b) .and. (l3a .eq.l3b) .and. (phi23a .eq. phi23b)) then 
-                    DSNGauss = signsq/Cl(1,nint(absl1a))/Cl(1,l2a)/Cl(1,l3a)/6.
+                 if (((l2a.eq.l2b) .and. (l3a .eq.l3b)) .or. ((l2a.eq.l3b) .and. (l3a .eq.l2b))) then
+                    DSNGauss = signsq/Cl(1,l1a)/Cl(1,l2a)/Cl(1,l3a)/6.
                     !<N^2> + delta <N^2>
-
-
                  else
                     DSNGauss = 0.d0
                     !<N^2> + delta <N^2>
@@ -168,14 +229,14 @@ program FlatSky
                  SumGauss = SumGauss + DSNGauss
                  SumNGauss =  SumNGauss + DSNGauss + DSNonGauss
 
-              enddo !phi23
+              enddo !l3b
 
-           enddo !phi23
-           !enddo !l3b
-        enddo !l2b
+           enddo !l2b
+        enddo !l1a
      enddo !l3a
+     !$OMP END PARAllEl DO
+      write(*,*) 'l2 = ', l2a
   enddo !l2a
-  !$OMP END PARAllEl DO
 
   write(*,'(I4,4E17.8)') lmax, SumGauss, SumNGauss, sqrt(SumGauss/SumNGauss)
   write(*,'(A12,X,I4,X,A19,X,F11.3)') 'For lmax = ',  lmax, 'the error on fnl = ', sqrt(1./SumGauss)
@@ -195,6 +256,7 @@ contains
          1.d0/(l1+1.d0)/l1/l3/(l3+1.d0)
     floc = floc*amp*2.E-7 !2.E-7  is introduced to get roughly same amplitude at l_max = 500 to full fnl_local
   end function floc
+
   real(dl) function length(x,y,phi)
     integer, intent(in) :: x, y
     real(dl), intent(in) :: phi
@@ -209,15 +271,29 @@ contains
     invlength = NINT(x*cos(phi) + sqrt(y**2-x**2*(sin(phi))**2))
   end function invlength
 
-  real(dl) function angle(x,y,z,phi)
-    integer, intent(in) :: x,y
-    real(dl), intent(in) :: phi, z
-    angle = acos((x-y*cos(phi))/z)
-    if (angle .ne. angle) angle  = 0.d0
+!!$  real(dl) function angle(x,y,z,phi)
+!!$    integer, intent(in) :: x,y
+!!$    real(dl), intent(in) :: phi, z
+!!$    angle = acos((x-y*cos(phi))/z)
+!!$    if (angle .ne. angle) angle  = 0.d0
+!!$  end function angle
+
+!!$  real(dl) function angle(x,y,phi)
+!!$    integer, intent(in) :: x,y
+!!$    real(dl), intent(in) :: phi
+!!$    angle = acos((x-y*cos(phi))/length(x,y,phi))
+!!$    if (angle .ne. angle) angle  = 0.d0
+!!$  end function angle
+
+  real(dl) function angle(x,y,z)
+    integer, intent(in) :: x,y,z
+    angle = acos((x**2+y**2-z**2)/(2.*x*y))
+    !if (angle .ne. angle) angle  = 0.d0
   end function angle
 
   real(dl) function exphi(x,y,z)
-    integer, intent(in) :: x,y,z
+    integer, intent(in) :: y,z
+    real(dl), intent(in) :: x
 
     exphi = acos((-x**2+y**2+z**2)/2./y/z)
     if (exphi .ne. exphi) exphi = pi
