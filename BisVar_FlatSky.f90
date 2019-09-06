@@ -124,7 +124,9 @@ program FlatSky
   lmax = 400
   lmin = 2
 
-  intmax = 128
+  !intmax = 60 : lmax = 100
+  intmax = 60
+  
   imin = 9
   lmax = ellar(intmax)
   lmin = ellar(imin)
@@ -136,7 +138,7 @@ program FlatSky
 
   do i = imin, intmax !l2 loop
      l2a = ellar(i)
-     
+
      !$OMP PARALLEL DO DEFAUlT(SHARED),SCHEDULE(dynamic) &
      !$OMP PRIVATE(l1a,l1b,l3a,l2b,l3b,l1almax,l1almin,l3blmin,l3blmax,j), &
      !$OMP PRIVATE(fnl,phi23a,phi23b,signsq,phi21a,phi31a,phi21b,phi31b,phi2a3b,phi2b3a), &
@@ -204,21 +206,41 @@ program FlatSky
                  absl2al2b = nint(length(l2a,l2b,phi2a2b)) !|l2+l2'|
                  absl3al3b = nint(length(l3a,l3b,phi3a3b)) !|l3+l3'|
 
+                 
+
                  absl2al3b = nint(length(l2a,l3b,phi2a3b)) !|l2+l3'|
                  absl2bl3a = nint(length(l2b,l3a,phi2b3a)) !|l2'+l3|
 
+                 
+
+!!$                 if(absl2bl3a .lt. lmin) absl2bl3a = lmin
+!!$                 if(absl2al2b .lt. lmin) absl2al2b = lmin
+!!$
+!!$                 if(absl2bl3a .gt. lmax) absl2bl3a = lmax
+!!$                 if(absl2al2b .gt. lmax) absl2al2b = lmax
+                 
+                ! absl2bl3a
                  !3 unique terms 
                  DB(1) = 4.d0*( Cl(1,l1a)*Cl(1,l2a)*Cl(1,l2b)*pClpp(1,l1a)* &
                       (l2a**2+l2dotl3a)*(l2b**2+l2dotl3b))
-                 DB(2) = 4.d0*( Cl(1,l1a)*Cl(1,l2a)*Cl(1,l2b)*pClpp(1,absl2bl3a)* &
-                      (l2a**2+l2adotl3b)*(l2b**2+l2bdotl3a))
-                 DB(3) = 4.d0*( Cl(1,l1a)*Cl(1,l2b)*Cl(1,l3b)*pClpp(1,absl2al2b)* &
-                      (l3b**2+l3adotl3b)*(l2b**2+l2adotl2b))                 
+                 if(absl2bl3a .lt. lmin) then
+                    DB(2) = 0.d0
+                 else                    
+                    DB(2) = 4.d0*( Cl(1,l1a)*Cl(1,l2a)*Cl(1,l2b)*pClpp(1,absl2bl3a)* &
+                         (l2a**2+l2adotl3b)*(l2b**2+l2bdotl3a))
+                 endif
+                 if(absl2al2b .lt. lmin) then
+                    DB(3) = 0.d0
+                 else                    
+                    DB(3) = 4.d0*( Cl(1,l1a)*Cl(1,l2b)*Cl(1,l3b)*pClpp(1,absl2al2b)* &
+                         (l3b**2+l3adotl3b)*(l2b**2+l2adotl2b))       
+                 endif
+                          
 
-                 if (phi21b .ne. phi21b) write(*,*) l2b, l3b, l1b
-                 DSNonGauss = 9.d0*signsq*Sum(DB(1:2))/36./Cl(1,l1a)**2/Cl(1,l2a)/Cl(1,l2b)/Cl(1,l3a)/Cl(1,l3b)
+                 DSNonGauss = 9.d0*signsq*Sum(DB(3:3))/36./Cl(1,l1a)**2/Cl(1,l2a)/Cl(1,l2b)/Cl(1,l3a)/Cl(1,l3b)
 
-                 if (((l2a.eq.l2b) .and. (l3a .eq.l3b)) .or. ((l2a.eq.l3b) .and. (l3a .eq.l2b))) then
+                 !if (((l2a.eq.l2b) .and. (l3a .eq.l3b)) .or. ((l2a.eq.l3b) .and. (l3a .eq.l2b))) then
+                 if (((l2a.eq.l2b) .and. (l3a .eq.l3b))) then
                     DSNGauss = signsq/Cl(1,l1a)/Cl(1,l2a)/Cl(1,l3a)/6.
                     !<N^2> + delta <N^2>
                  else
