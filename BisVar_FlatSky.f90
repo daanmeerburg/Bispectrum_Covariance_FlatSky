@@ -285,41 +285,11 @@ contains
     length = sqrt(x**2+y**2-2.*x*y*cos(phi))
   end function length
 
-  integer function invlength(x,y,phi)
-    integer, intent(in) :: x, y
-    real(dl), intent(in) :: phi
-    !nearest integer
-    !have to figure this one out.... 
-    invlength = NINT(x*cos(phi) + sqrt(y**2-x**2*(sin(phi))**2))
-  end function invlength
-
-!!$  real(dl) function angle(x,y,z,phi)
-!!$    integer, intent(in) :: x,y
-!!$    real(dl), intent(in) :: phi, z
-!!$    angle = acos((x-y*cos(phi))/z)
-!!$    if (angle .ne. angle) angle  = 0.d0
-!!$  end function angle
-
-!!$  real(dl) function angle(x,y,phi)
-!!$    integer, intent(in) :: x,y
-!!$    real(dl), intent(in) :: phi
-!!$    angle = acos((x-y*cos(phi))/length(x,y,phi))
-!!$    if (angle .ne. angle) angle  = 0.d0
-!!$  end function angle
-
   real(dl) function angle(x,y,z)
     integer, intent(in) :: x,y,z
     angle = acos((x**2+y**2-z**2)/(2.*x*y))
     !if (angle .ne. angle) angle  = 0.d0
   end function angle
 
-  real(dl) function exphi(x,y,z)
-    integer, intent(in) :: y,z
-    real(dl), intent(in) :: x
-
-    exphi = acos((-x**2+y**2+z**2)/2./y/z)
-    if (exphi .ne. exphi) exphi = pi
-
-  end function exphi
 
 end program FlatSky
