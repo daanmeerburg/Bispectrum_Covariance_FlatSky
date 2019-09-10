@@ -125,7 +125,7 @@ program FlatSky
   lmin = 2
 
   !intmax = 60 : lmax = 100
-  intmax = 60
+  intmax = 170
   
   imin = 9
   lmax = ellar(intmax)
@@ -187,8 +187,8 @@ program FlatSky
                  phi21b = angle(l1b,l2b,l3b)
                  phi31b = pi - phi23b - phi21b
 
-                 phi2a3b = abs(phi21a + phi31b) !correct direction
-                 phi2b3a = abs(phi21b + phi31a)
+                 phi2a3b = phi21a + phi31b !correct direction
+                 phi2b3a = phi21b + phi31a
 
                  phi2a2b = pi- phi21a - phi21b
                  phi3a3b = pi- phi31a - phi31b
@@ -223,13 +223,13 @@ program FlatSky
                  !3 unique terms 
                  DB(1) = 4.d0*( Cl(1,l1a)*Cl(1,l2a)*Cl(1,l2b)*pClpp(1,l1a)* &
                       (l2a**2+l2dotl3a)*(l2b**2+l2dotl3b))
-                 if(absl2bl3a .lt. lmin) then
+                 if(absl2bl3a .lt. lmin .or. absl2bl3a .gt. lmax) then
                     DB(2) = 0.d0
                  else                    
                     DB(2) = 4.d0*( Cl(1,l1a)*Cl(1,l2a)*Cl(1,l2b)*pClpp(1,absl2bl3a)* &
                          (l2a**2+l2adotl3b)*(l2b**2+l2bdotl3a))
                  endif
-                 if(absl2al2b .lt. lmin) then
+                 if(absl2al2b .lt. lmin .or. absl2al2b .gt. lmax) then
                     DB(3) = 0.d0
                  else                    
                     DB(3) = 4.d0*( Cl(1,l1a)*Cl(1,l2b)*Cl(1,l3b)*pClpp(1,absl2al2b)* &
@@ -237,10 +237,10 @@ program FlatSky
                  endif
                           
 
-                 DSNonGauss = 9.d0*signsq*Sum(DB(3:3))/36./Cl(1,l1a)**2/Cl(1,l2a)/Cl(1,l2b)/Cl(1,l3a)/Cl(1,l3b)
+                 DSNonGauss = 9.d0*signsq*Sum(DB(1:1))/36./Cl(1,l1a)**2/Cl(1,l2a)/Cl(1,l2b)/Cl(1,l3a)/Cl(1,l3b)
 
-                 !if (((l2a.eq.l2b) .and. (l3a .eq.l3b)) .or. ((l2a.eq.l3b) .and. (l3a .eq.l2b))) then
-                 if (((l2a.eq.l2b) .and. (l3a .eq.l3b))) then
+                 if (((l2a.eq.l2b) .and. (l3a .eq.l3b)) .or. ((l2a.eq.l3b) .and. (l3a .eq.l2b))) then
+                 !if (((l2a.eq.l2b) .and. (l3a .eq.l3b))) then
                     DSNGauss = signsq/Cl(1,l1a)/Cl(1,l2a)/Cl(1,l3a)/6.
                     !<N^2> + delta <N^2>
                  else
