@@ -126,7 +126,7 @@ program FlatSky
   lmin = 2
 
   !intmax = 60 : lmax = 100
-  intmax = 60
+  intmax = 180
 
   imin = 9
   lmax = ellar(intmax)
