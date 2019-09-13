@@ -9,9 +9,9 @@ program FlatSky
   real(dl), pointer :: Cl(:,:), Cll(:,:)
   real(dl), pointer :: pClpp(:,:)
   integer :: l1, l2a, l3a, l2b, l3b
-  integer :: l3blmin, l3blmax,l1almax,l1almin, l1a,l1b
+  integer :: l3blmin, l3blmax,l3almax,l3almin, l1a,l1b
   integer :: lmax, lmin
-  integer :: i,j,k
+  integer :: i,j,k,m
   real(dl) :: phi23a, phi23b, phi31a, phi31b, phi21a, phi21b, phi2a3b, phi2b3a, phi2a2b, phi3a3b
   real(dl) :: fnl, signsq
   real(dl) :: absl2l3a, absl2l3b, absl3al3b, absl2al2b, absl2al3b, absl2bl3a
@@ -89,11 +89,11 @@ program FlatSky
   allocate(Cll(4,2:lmax))
   allocate(pClpp(3,2:lmax))
 
-  Folder1 = 'SOspectra/'
+  Folder1 = './SOspectra/'
   Clfile = trim(Folder1)//trim('SOspectra_lenspotentialCls.dat')
   Cllfile = trim(Folder1)//trim('SOspectra_lensedCls.dat')
   !from Alex:
-  Cllfile = '../SO_forecasts/CAMB/cosmo2017_10K_acc3_lensedCls.dat'
+  Cllfile = './SO_forecasts/CAMB/cosmo2017_10K_acc3_lensedCls.dat'
   open(unit=17,file = Clfile, status='old')
   open(unit=18,file = Cllfile, status='old')
 
@@ -143,22 +143,22 @@ program FlatSky
 
   !do i = imin, intmax !l2 loop
   do i = imin, intmax   
-     l2a = ellar(i)
+     l1a = ellar(i)
 
      !$OMP PARALLEL DO DEFAUlT(SHARED),SCHEDULE(dynamic) &
-     !$OMP PRIVATE(l1a,l1b,l3a,l2b,l3b,l1almax,l1almin,l3blmin,l3blmax,j,k), &
+     !$OMP PRIVATE(l1b,l2a,l3a,l2b,l3b,l3almax,l3almin,l3blmin,l3blmax,j,k), &
      !$OMP PRIVATE(fnl,phi23a,phi23b,signsq,phi21a,phi31a,phi21b,phi31b,phi2a3b,phi2b3a), &
      !$OMP PRIVATE(phi2a2b,phi3a3b,l2dotl3a,l2dotl3b,l2adotl3b,l2bdotl3a,l3adotl3b,l2adotl2b), &
      !$OMP PRIVATE(absl2al3b,absl2al2b,absl3al3b,absl2bl3a,DB,DSNonGauss,DSNGauss,l1dotl2a,l1adotl2b), &
      !$OMP REDUCTION(+:SumGauss,SumNGauss)
      do j = imin, intmax !l3 loop
      !do l3a = lmin, lmax   
-        l3a = ellar(j)
+        l2a = ellar(j)
         !set minimum and max values of third leg (triangle constraint)
-        l1almax = min(l2a+l3a,lmax)
-        l1almin = max(abs(l2a-l3a),lmin)
+        l3almax = min(l2a+l1a,lmax)
+        l3almin = max(abs(l2a-l1a),lmin)
 
-        do l1a = l1almin, l1almax, stp
+        do l3a = l3almin, l3almax, stp
 
            !angle between l2 and l3
            phi23a = angle(l2a,l3a,l1a)
@@ -177,7 +177,8 @@ program FlatSky
            l1b = l1a
            !l2b can max be size of l1 (or l1'). Can be small, given l3
            !il2max =
-           do l2b = lmin, lmax, stp
+           do k = imin, intmax
+              l2b = ellar(k)
            !do k = imin, intmax !l2' loop
            !   l2b = ellar(k)
 
@@ -269,7 +270,7 @@ program FlatSky
         enddo !l1a
      enddo !l3a
      !$OMP END PARAllEl DO
-     write(*,*) 'l2 = ', l2a
+     write(*,*) 'l2 = ', l1a
   enddo !l2a
 
   write(*,'(I4,4E17.8)') lmax, SumGauss, SumNGauss, sqrt(SumGauss/SumNGauss)
