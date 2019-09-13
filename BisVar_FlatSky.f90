@@ -11,8 +11,9 @@ program FlatSky
   integer :: l1, l2a, l3a, l2b, l3b
   integer :: l3blmin, l3blmax,l3almax,l3almin, l1a,l1b
   integer :: lmax, lmin
-  integer :: i,j,k,m
+  integer :: i,j,k,m,n
   real(dl) :: phi23a, phi23b, phi31a, phi31b, phi21a, phi21b, phi2a3b, phi2b3a, phi2a2b, phi3a3b
+  real(dl) :: phi21amax,phi21bmax,phi21amin,phi21bmin,dPhia,dPhib
   real(dl) :: fnl, signsq
   real(dl) :: absl2l3a, absl2l3b, absl3al3b, absl2al2b, absl2al3b, absl2bl3a
   real(dl) :: l2dotl3a, l2dotl3b, l2adotl3b,l2bdotl3a,l3adotl3b,l2adotl2b,l1dotl2a,l1adotl2b
@@ -21,7 +22,7 @@ program FlatSky
   real(dl) :: CMB2COBEnorm = 7428350250000.d0
 
   integer :: ellar(512), dellar(512), elltoi(5000)
-  integer :: intmax, imin
+  integer :: intmax, imin,nPhib,nPhia,nPhi
   integer :: stp
 
 
@@ -126,12 +127,12 @@ program FlatSky
   lmin = 2
 
   !intmax = 60 : lmax = 100
-  intmax = 180
+  intmax = 200
 
-  imin = 9
+  imin = 1
   lmax = ellar(intmax)
   lmin = ellar(imin)
-
+  nPhi = 160
   !to make it faster:
   stp  = 1
 
@@ -142,13 +143,13 @@ program FlatSky
   
 
   !do i = imin, intmax !l2 loop
-  do i = imin, intmax   
+  do i = 2, 20   
      l1a = ellar(i)
 
      !$OMP PARALLEL DO DEFAUlT(SHARED),SCHEDULE(dynamic) &
-     !$OMP PRIVATE(l1b,l2a,l3a,l2b,l3b,l3almax,l3almin,l3blmin,l3blmax,j,k), &
-     !$OMP PRIVATE(fnl,phi23a,phi23b,signsq,phi21a,phi31a,phi21b,phi31b,phi2a3b,phi2b3a), &
-     !$OMP PRIVATE(phi2a2b,phi3a3b,l2dotl3a,l2dotl3b,l2adotl3b,l2bdotl3a,l3adotl3b,l2adotl2b), &
+     !$OMP PRIVATE(l1b,l2a,l3a,l2b,l3b,l3almax,l3almin,l3blmin,l3blmax,j,k,m,n), &
+     !$OMP PRIVATE(fnl,phi23a,phi23b,signsq,phi21a,phi31a,phi21b,phi31b,phi2a3b,phi2b3a,nPhia,nPhib,dPhia,dPhib), &
+     !$OMP PRIVATE(phi2a2b,phi3a3b,l2dotl3a,l2dotl3b,l2adotl3b,l2bdotl3a,l3adotl3b,l2adotl2b,phi21amax,phi21bmax,phi21amin,phi21bmin), &
      !$OMP PRIVATE(absl2al3b,absl2al2b,absl3al3b,absl2bl3a,DB,DSNonGauss,DSNGauss,l1dotl2a,l1adotl2b), &
      !$OMP REDUCTION(+:SumGauss,SumNGauss)
      do j = imin, intmax !l3 loop
@@ -158,16 +159,37 @@ program FlatSky
         l3almax = min(l2a+l1a,lmax)
         l3almin = max(abs(l2a-l1a),lmin)
 
-        do l3a = l3almin, l3almax, stp
+
+        nPhia = nPhi!min(l3almax-l3almin,nPhi)
+        if (abs(l2a-l1a) .gt. lmin) then
+          phi21amin = 0
+        else
+          phi21amin = angle(l1a,l2a,lmin)
+        endif
+        
+        if ((l2a+l1a) .gt. lmax) then
+          phi21amax = angle(l1a,l2a,lmax)
+        else
+          phi21amax = pi
+        endif
+
+        dPhia = (phi21amax-phi21amin)/nPhia
+
+        do m = 0,max(nPhia-1,0)
+            phi21a = dPhia*m+phi21amin
+            l3a = nint(length(l1a,l2a,phi21a))
+            phi23a = angle(l2a,l3a,l1a)
+            
+        !do l3a = l3almin, l3almax, stp
 
            !angle between l2 and l3
-           phi23a = angle(l2a,l3a,l1a)
+           !phi23a = angle(l2a,l3a,l1a)
            !inner products:
            !l2dotl3a = l2a*l3a*cos(phi23a) !l2.l3
            l1dotl2a = l1a*l2a*cos(phi21a)
 
            !other angles; needed for 11 permutations 
-           phi21a = angle(l1a,l2a,l3a)
+           !phi21a = angle(l1a,l2a,l3a)
            phi31a = pi - phi23a - phi21a
 
            !get the SW bispectrum for the triplet (l1, l2 ,l3)
@@ -187,15 +209,32 @@ program FlatSky
               !maximum:
               l3blmax = min(l1b+l2b,lmax)
 
-              do l3b = l3blmin, l3blmax, stp !final loop: l3'
+              !do l3b = l3blmin, l3blmax, stp !final loop: l3'
+              nPhib = nPhi!min(l3blmax-l3blmin,nPhi)
+              if (abs(l2b-l1b) .gt. lmin) then
+                phi21bmin = 0
+              else
+                phi21bmin = angle(l1b,l2b,lmin)
+              endif
+              
+              if ((l2b+l1b) .gt. lmax) then
+                phi21bmax = angle(l1b,l2b,lmax)
+              else
+                phi21bmax = pi
+              endif
 
+              dPhib = (phi21bmax-phi21bmin)/nPhib
+              do n = 0,max(nPhib-1,0)
+
+                  phi21b = dPhib*n+phi21bmin
+                  l3b = nint(length(l1b,l2b,phi21b))
                  !prime triangle angle between l2' and l3'
                  phi23b = angle(l2b,l3b,l1b)
                  !compute fnl^2
                  signsq = fnl*floc(l1b,l2b,l3b)
 
                  !other angles; needed for 11 permutations 
-                 phi21b = angle(l1b,l2b,l3b)
+                 !phi21b = angle(l1b,l2b,l3b)
                  l1adotl2b = l1a*l2b*cos(phi21b)
                  phi31b = pi - phi23b - phi21b
 
@@ -223,6 +262,8 @@ program FlatSky
 !!$                 
 !!$                 
 !!$
+
+                  
                  !if(absl2bl3a .lt. lmin) absl2bl3a = lmin
                  !if(absl2al2b .lt. lmin) absl2al2b = lmin
 
@@ -250,11 +291,11 @@ program FlatSky
 !!$                 endif
 !!$                          
 !!$
-                 DSNonGauss = signsq*Sum(DB(1:1))/Cl(1,l1a)**2/Cl(1,l2a)/Cl(1,l2b)/Cl(1,l3a)/Cl(1,l3b)/(2.*pi)**4 *dellar(i)*dellar(j)*(stp)**3
+                 DSNonGauss = 2.*pi*signsq*Sum(DB(1:1))/Cl(1,l1a)**2/Cl(1,l2a)/Cl(1,l2b)/Cl(1,l3a)/Cl(1,l3b)/(2.*pi)**4 *dellar(i)*dellar(j)*dellar(k)*(stp)**2*l1a*l2a*dPhia*l2b*dPhib
 !!$
 !!$                 !if (((l2a.eq.l2b) .and. (l3a .eq.l3b)) .or. ((l2a.eq.l3b) .and. (l3a .eq.l2b))) then
                  if (((l2a.eq.l2b) .and. (l3a .eq.l3b))) then
-                    DSNGauss = signsq/Cl(1,l1a)/Cl(1,l2a)/Cl(1,l3a)/6./(2.*pi)**2 *dellar(i)*dellar(j)*stp
+                    DSNGauss = 2.*pi*signsq/Cl(1,l1a)/Cl(1,l2a)/Cl(1,l3a)/6./(2.*pi)**2 *dellar(i)*dellar(j)*stp*l1a*l2a*dPhia
                     !<N^2> + delta <N^2>
                  else
                     DSNGauss = 0.d0
@@ -270,7 +311,7 @@ program FlatSky
         enddo !l1a
      enddo !l3a
      !$OMP END PARAllEl DO
-     write(*,*) 'l2 = ', l1a
+     write(*,*) 'l1 = ', l1a
   enddo !l2a
 
   write(*,'(I4,4E17.8)') lmax, SumGauss, SumNGauss, sqrt(SumGauss/SumNGauss)
