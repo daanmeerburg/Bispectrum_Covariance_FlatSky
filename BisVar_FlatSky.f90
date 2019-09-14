@@ -94,7 +94,7 @@ program FlatSky
   Clfile = trim(Folder1)//trim('SOspectra_lenspotentialCls.dat')
   Cllfile = trim(Folder1)//trim('SOspectra_lensedCls.dat')
   !from Alex:
-  Cllfile = './SO_forecasts/CAMB/cosmo2017_10K_acc3_lensedCls.dat'
+  !Cllfile = './SO_forecasts/CAMB/cosmo2017_10K_acc3_lensedCls.dat'
   open(unit=17,file = Clfile, status='old')
   open(unit=18,file = Cllfile, status='old')
 
@@ -127,7 +127,7 @@ program FlatSky
   lmin = 2
 
   !intmax = 60 : lmax = 100
-  intmax = 200
+  intmax = 233
 
   imin = 1
   lmax = ellar(intmax)
@@ -143,7 +143,7 @@ program FlatSky
   
 
   !do i = imin, intmax !l2 loop
-  do i = 2, 20   
+  do i = 2, intmax   
      l1a = ellar(i)
 
      !$OMP PARALLEL DO DEFAUlT(SHARED),SCHEDULE(dynamic) &
