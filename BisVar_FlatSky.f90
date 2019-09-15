@@ -125,7 +125,7 @@ program FlatSky
   Cllfile = trim(Folder1)//trim('SOspectra_lensedCls.dat')
   !from Alex:
 
-  Cllfile = './SO_forecasts/CAMB/cosmo2017_10K_acc3_lensedCls.dat'
+  !Cllfile = './SO_forecasts/CAMB/cosmo2017_10K_acc3_lensedCls.dat'
 
 
 
@@ -133,7 +133,7 @@ program FlatSky
   !Will:
   tensDir = TRIM(tensDir)//'/Data/alphaBetaDir/'
   !Daan:
-  !tensDir = '/mnt/raid-cita/meerburg/SO_forecasts/alphabeta'
+  tensDir = '/mnt/raid-cita/meerburg/SO_forecasts/alphabeta'
   write(*,*) tensDir      
   !allocate and read bessel transforms
   !you should check the subroutine to see if your file is directed correctly
@@ -208,11 +208,11 @@ program FlatSky
   lmin = 2
 
   !intmax = 60 : lmax = 100
-  intmax = 233
+  intmax = 160
   imin = 1
   lmax = ellar(intmax)
   lmin = ellar(imin)
-  nPhi = 200
+  nPhi = 1000
   !to make it faster:
   stp  = 1
 
