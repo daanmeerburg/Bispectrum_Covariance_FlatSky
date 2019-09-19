@@ -1,12 +1,12 @@
 program FlatSky 
   implicit none
-   integer, parameter :: dl= KIND(1.d0)
+  integer, parameter :: dl= KIND(1.d0)
   type :: bfs
      real(dl), allocatable :: rarray(:), deltar(:),Cll(:,:),pCll(:,:)
      real(dl), allocatable :: ar(:,:,:), br(:,:,:), gr(:,:,:), dr(:,:,:)
      integer :: flagDoWigner
   end type bfs
-  
+
 
   real(dl), parameter :: pi = 3.14159265359
 
@@ -28,7 +28,7 @@ program FlatSky
   real(dl) :: absl2l3a, absl2l3b, absl3al3b, absl2al2b, absl2al3b, absl2bl3a
   real(dl) :: l2dotl3a, l2dotl3b, l2adotl3b,l2bdotl3a,l3adotl3b,l2adotl2b,l1dotl2a,l1adotl2b
   real(dl) :: DB(3)
-  real(dl) :: SumGauss, DSNGauss,  SumNGauss, DSNonGauss, SumNGaussAll
+  real(dl) :: SumGauss, DSNGauss,  SumNGauss, DSNonGauss, SumNGaussAll, measureG, measureNG
   real(dl) :: CMB2COBEnorm = 7428350250000.d0
 
 
@@ -41,7 +41,7 @@ program FlatSky
 
   type(bfs) :: P
   type(bfs) :: P_ISWlens
-  integer :: ellar(512), dellar(512), elltoi(5000)
+  integer :: ellar(2048), dellar(2048), elltoi(5000)
   integer :: intmax, imin,nPhib,nPhia,nPhi
   integer :: stp
 
@@ -69,7 +69,7 @@ program FlatSky
 !!$     endif
 !!$     !write(*,*) 'ell:', ellar(i)
 !!$  enddo
-  do i  = 1, 256
+  do i  = 1, 512
      if (i .le. 47) then
         ellar(i) = i+1
         dellar(i) = 1.d0
@@ -97,8 +97,8 @@ program FlatSky
      endif
      !write(*,*) 'ell:', ellar(i)
   enddo
-!!$  do i  = 1, 512
-!!$     if (i .le. 399) then
+!!$  do i  = 1, 2048
+!!$     if (i .le. 2048) then
 !!$        ellar(i) = i + 1
 !!$        dellar(i) = 1.d0
 !!$     else
@@ -205,16 +205,17 @@ program FlatSky
   DB = 0.d0
   !structure
   !l2/l3/l3/l2'/l3'
-  lmax = 400
+  lmax = 200
   lmin = 2
 
   !intmax = 60 : lmax = 100
-  intmax = 160
-  imin = 1
+  !intmax = 210 : lmax = 3810
+  intmax = 210
+  imin = 29
   lmax = ellar(intmax)
   lmin = ellar(imin)
 
-  nPhi = 300
+  nPhi = 100
 
   !to make it faster:
   stp  = 1
@@ -222,235 +223,220 @@ program FlatSky
   write(*,*) 'lmax:',lmax
   write(*,*) 'lmin:',lmin
 
-   TotSumCV = 0.d0
-   TotSumCVISWLens = 0.d0
-   TotSumCVLensCross = 0.d0
-   !$OMP PARALLEL DO DEFAUlT(SHARED),SCHEDULE(dynamic) &
-   !$OMP PRIVATE(l1,l2,l3, min_l,max_l,m1,p1,q1,m2,p2,q2), &
-   !$OMP PRIVATE(Det,TempCovCV,atj,bis,bis_ISWlens,tmpPrefac) &
-   !$OMP PRIVATE(DetISWLens,DetLensCross,fnlISW,fnl,bispectrum,bispectrum_ISWlens) &
-   !$OMP REDUCTION(+:TotSumCV,TotSumCVISWLens,TotSumCVLensCross) 
-   do l1 = lmin, lmax
-      allocate(bis(nfields**3,lmax))
-      allocate(bis_ISWlens(nfields**3,lmax))
-      allocate(bispectrum(nfields,nfields,nfields,1,lmax))
-      allocate(bispectrum_ISWlens(nfields,nfields,nfields,1,lmax))       
-      do l2 =  max(lmin,l1), lmax
-         min_l = max(abs(l1-l2),l2)
-         if (mod(l1+l2+min_l,2)/=0) then
-            min_l = min_l+1 !l3 should only lead to parity even numbers
-         end if
-         max_l = min(lmax,l1+l2)
+  TotSumCV = 0.d0
+  TotSumCVISWLens = 0.d0
+  TotSumCVLensCross = 0.d0
+  !$OMP PARALLEL DO DEFAUlT(SHARED),SCHEDULE(dynamic) &
+  !$OMP PRIVATE(l1,l2,l3, min_l,max_l,m1,p1,q1,m2,p2,q2), &
+  !$OMP PRIVATE(Det,TempCovCV,atj,bis,bis_ISWlens,tmpPrefac) &
+  !$OMP PRIVATE(DetISWLens,DetLensCross,fnlISW,fnl,bispectrum,bispectrum_ISWlens) &
+  !$OMP REDUCTION(+:TotSumCV,TotSumCVISWLens,TotSumCVLensCross) 
+  do l1 = lmin, lmax
+     allocate(bis(nfields**3,lmax))
+     allocate(bis_ISWlens(nfields**3,lmax))
+     allocate(bispectrum(nfields,nfields,nfields,1,lmax))
+     allocate(bispectrum_ISWlens(nfields,nfields,nfields,1,lmax))       
+     do l2 =  max(lmin,l1), lmax
+        min_l = max(abs(l1-l2),l2)
+        if (mod(l1+l2+min_l,2)/=0) then
+           min_l = min_l+1 !l3 should only lead to parity even numbers
+        end if
+        max_l = min(lmax,l1+l2)
 
-         bis = 0.d0
-         bis_ISWlens = 0.d0
-         bispectrum = 0.d0
-         bispectrum_ISWlens = 0.d0
-         call get_bispectrum_sss(P,l1,l2,2,lmax,shape,nfields,bis)
-         call get_bispectrum_sss(P_ISWlens,l1,l2,2,lmax,5,nfields,bis_ISWlens)
-         call GetThreeJs(atj(abs(l2-l1)),l1,l2,0,0)
-         call reshapeBispectrum(bis,bispectrum,1,minfields,nfields)
-         call reshapeBispectrum(bis_ISWlens,bispectrum_ISWlens,1,minfields,nfields)
-         do l3=min_l,max_l, 2 !sum has to be even
-            tmpPrefac = (atj(l3)*prefactor(l1,l2,l3)*.5)**2/tr(l1,l2,l3)
-            do m2  = minfields,nfields !T,E (8 terms only)
-               do p2 = minfields,nfields !T,E
-                  do q2 = minfields,nfields !T,E
-                     do m1  = minfields,nfields !T,E (8 terms only)
-                        do p1 = minfields,nfields !T,E
-                           do q1 = minfields,nfields !T,E
-                              TotSumCVLensCross = TotSumCVLensCross+bispectrum_ISWlens(m1,p1,q1,1,l3)*invCll(m1,m2,l1)* &
-                                   invCll(p1,p2,l2)*invCll(q1,q2,l3)*bispectrum(m2,p2,q2,1,l3)*tmpPrefac
-                              TotSumCVISWLens = TotSumCVISWLens+bispectrum_ISWlens(m1,p1,q1,1,l3)*invCll(m1,m2,l1)* &
-                                   invCll(p1,p2,l2)*invCll(q1,q2,l3)*bispectrum_ISWlens(m2,p2,q2,1,l3)*tmpPrefac
-                              TotSumCV = TotSumCV +bispectrum(m1,p1,q1,1,l3)*invCll(m1,m2,l1)* &
-                                   invCll(p1,p2,l2)*invCll(q1,q2,l3)*bispectrum(m2,p2,q2,1,l3)*tmpPrefac
-                           enddo
-                        enddo
-                     enddo
-                  enddo
-               enddo
-            enddo
+        bis = 0.d0
+        bis_ISWlens = 0.d0
+        bispectrum = 0.d0
+        bispectrum_ISWlens = 0.d0
+        call get_bispectrum_sss(P,l1,l2,2,lmax,shape,nfields,bis)
+        call get_bispectrum_sss(P_ISWlens,l1,l2,2,lmax,5,nfields,bis_ISWlens)
+        call GetThreeJs(atj(abs(l2-l1)),l1,l2,0,0)
+        call reshapeBispectrum(bis,bispectrum,1,minfields,nfields)
+        call reshapeBispectrum(bis_ISWlens,bispectrum_ISWlens,1,minfields,nfields)
+        do l3=min_l,max_l, 2 !sum has to be even
+           tmpPrefac = (atj(l3)*prefactor(l1,l2,l3)*.5)**2/tr(l1,l2,l3)
+           do m2  = minfields,nfields !T,E (8 terms only)
+              do p2 = minfields,nfields !T,E
+                 do q2 = minfields,nfields !T,E
+                    do m1  = minfields,nfields !T,E (8 terms only)
+                       do p1 = minfields,nfields !T,E
+                          do q1 = minfields,nfields !T,E
+                             TotSumCVLensCross = TotSumCVLensCross+bispectrum_ISWlens(m1,p1,q1,1,l3)*invCll(m1,m2,l1)* &
+                                  invCll(p1,p2,l2)*invCll(q1,q2,l3)*bispectrum(m2,p2,q2,1,l3)*tmpPrefac
+                             TotSumCVISWLens = TotSumCVISWLens+bispectrum_ISWlens(m1,p1,q1,1,l3)*invCll(m1,m2,l1)* &
+                                  invCll(p1,p2,l2)*invCll(q1,q2,l3)*bispectrum_ISWlens(m2,p2,q2,1,l3)*tmpPrefac
+                             TotSumCV = TotSumCV +bispectrum(m1,p1,q1,1,l3)*invCll(m1,m2,l1)* &
+                                  invCll(p1,p2,l2)*invCll(q1,q2,l3)*bispectrum(m2,p2,q2,1,l3)*tmpPrefac
+                          enddo
+                       enddo
+                    enddo
+                 enddo
+              enddo
+           enddo
 
-         enddo !l3 loop
-      enddo !l2 loop
-      deallocate(bis)
-      deallocate(bis_ISWlens)
-      deallocate(bispectrum)
-      deallocate(bispectrum_ISWlens)
-   enddo !L1 loop
-   !$OMP END PARAllEl DO
+        enddo !l3 loop
+     enddo !l2 loop
+     deallocate(bis)
+     deallocate(bis_ISWlens)
+     deallocate(bispectrum)
+     deallocate(bispectrum_ISWlens)
+  enddo !L1 loop
+  !$OMP END PARAllEl DO
 
 
-   DetFishCV = TotSumCVISWLens*TotSumCV -TotSumCVLensCross**2
-   alpha = TotSumCVISWLens/DetFishCV !C/det
-   beta = -TotSumCVLensCross/DetFishCV !A/det 
-   if(.not. want_ISW_correction) then
-      alpha=1./TotSumCV
-      beta = 0.
-   endif
-   write(*,*) 'lensing-ISW-fnl_local correlation coefficient:', TotSumCVLensCross/TotSumCV**(1./2)/TotSumCVISWLens**(1./2)
-   write(*,*) 'Fisher local error:', 1/TotSumCV**(1./2)
-   write(*,*) 'Fisher ISW-lensing error:', 1/TotSumCVISWLens**(1./2)
-   write(*,*) 'alpha', alpha, 'beta', beta
-   !endif
-  
+  DetFishCV = TotSumCVISWLens*TotSumCV -TotSumCVLensCross**2
+  alpha = TotSumCVISWLens/DetFishCV !C/det
+  beta = -TotSumCVLensCross/DetFishCV !A/det 
+  if(.not. want_ISW_correction) then
+     alpha=1./TotSumCV
+     beta = 0.
+  endif
+  write(*,*) 'lensing-ISW-fnl_local correlation coefficient:', TotSumCVLensCross/TotSumCV**(1./2)/TotSumCVISWLens**(1./2)
+  write(*,*) 'Fisher local error:', 1/TotSumCV**(1./2)
+  write(*,*) 'Fisher ISW-lensing error:', 1/TotSumCVISWLens**(1./2)
+  write(*,*) 'alpha', alpha, 'beta', beta
+  !endif
+
 
 
   do i = imin, intmax !l2 loop
-  !do i = 2, 20   
-    l1a = ellar(i)
+     !do i = 2, 20   
+     l1a = ellar(i)
+     l1b = l1a
 
+     allocate(bispectrum(nfields,nfields,nfields,lmax,lmax))
+     allocate(bispectrum_ISWlens(nfields,nfields,nfields,lmax,lmax))
+     allocate(bis(nfields**3,lmax))
+     allocate(bis_ISWlens(nfields**3,lmax))
+     bispectrum(:,:,:,:,:) = 0.d0
+     bispectrum_ISWlens(:,:,:,:,:) =0.d0
 
-    allocate(bispectrum(nfields,nfields,nfields,lmax,lmax))
-    allocate(bispectrum_ISWlens(nfields,nfields,nfields,lmax,lmax))
-    allocate(bis(nfields**3,lmax))
-    allocate(bis_ISWlens(nfields**3,lmax))
-    bispectrum(:,:,:,:,:) = 0.d0
-    bispectrum_ISWlens(:,:,:,:,:) =0.d0
+     do l2 = lmin, lmax
+        bis = 0.d0
+        call get_bispectrum_sss(P,l1a,l2,2,lmax,shape,nfields,bis)
+        ! bispectrum(1,1,1,l2,:) = bis(1,:)*.5 ! .5 for account for 2 in prefactor
+        call reshapeBispectrum(bis,bispectrum,l2,minfields,nfields)
+        bis_ISWlens = 0
+        call get_bispectrum_sss(P_ISWlens,l1a,l2,2,lmax,5,nfields,bis_ISWlens)
+        call reshapeBispectrum(bis_ISWlens*.5,bispectrum_ISWlens,l2,minfields,nfields)
 
-    do l2 = lmin, lmax
-       bis = 0.d0
-       call get_bispectrum_sss(P,l1a,l2,2,lmax,shape,nfields,bis)
-       ! bispectrum(1,1,1,l2,:) = bis(1,:)*.5 ! .5 for account for 2 in prefactor
-       call reshapeBispectrum(bis*.5,bispectrum,l2,minfields,nfields)
-       bis_ISWlens = 0
-       call get_bispectrum_sss(P_ISWlens,l1a,l2,2,lmax,5,nfields,bis_ISWlens)
-       call reshapeBispectrum(bis_ISWlens*.5,bispectrum_ISWlens,l2,minfields,nfields)
+        ! min_l = max(abs(l1a-l2),lmin) 
+        ! max_l = min(lmax,l1a+l2)
+        ! do l3=min_l,max_l,1 !sum has to be even
+        !    !write(*,'(3I4,2E18.7)') l1,l2,l3,bispectrum(1,1,1,l2,l3),bispectrum(2,2,2,l2,l3)
+        !    call applyInvC(bispectrum,invCll,minfields,nfields, l1a,l2,l3)
+        !    call applyInvC(bispectrum_ISWlens,invCll,minfields,nfields,l1a,l2,l3)
+        !    !write(*,'(3I4,2E18.7)') l1,l2,l3,bispectrum(1,1,1,l2,l3),bispectrum(2,2,2,l2,l3)
+        ! enddo
+        ! write(*,*),bispectrum_ISWlens(1,1,1,l2,l3),bispectrum_ISWlens(1,1,1,l3,l2)
 
-       ! min_l = max(abs(l1a-l2),lmin) 
-       ! max_l = min(lmax,l1a+l2)
-       ! do l3=min_l,max_l,1 !sum has to be even
-       !    !write(*,'(3I4,2E18.7)') l1,l2,l3,bispectrum(1,1,1,l2,l3),bispectrum(2,2,2,l2,l3)
-       !    call applyInvC(bispectrum,invCll,minfields,nfields, l1a,l2,l3)
-       !    call applyInvC(bispectrum_ISWlens,invCll,minfields,nfields,l1a,l2,l3)
-       !    !write(*,'(3I4,2E18.7)') l1,l2,l3,bispectrum(1,1,1,l2,l3),bispectrum(2,2,2,l2,l3)
-       ! enddo
-       ! write(*,*),bispectrum_ISWlens(1,1,1,l2,l3),bispectrum_ISWlens(1,1,1,l3,l2)
+        ! bispectrum_ISWlens(1,l2,:) = bis_ISWlens(1,:)*.5 ! .5 for account for 2 in prefactor
+     enddo
 
-       ! bispectrum_ISWlens(1,l2,:) = bis_ISWlens(1,:)*.5 ! .5 for account for 2 in prefactor
-    enddo
-
-    do l2 = lmin, lmax
-       max_l = min(lmax,l1a+l2)
-       min_l = max(abs(l1a-l2),lmin)  
-       do l3 = min_l,max_l,1
-          call permuteBis(bispectrum_ISWlens,minfields,nfields,l2,l3)
-          call permuteBis(bispectrum,minfields,nfields,l2,l3)
-          !write(*,*) l2,l3 bispectrum(1,1,1,l2,l3),bispectrum(1,1,1,l3,l2)
-          ! bispectrum(1,l3,l2) = bispectrum(1,l2,l3)
-          ! bispectrum_ISWlens(1,l3,l2) = bispectrum_ISWlens(1,l2,l3)
-          !bispectrum(1,l3,l2) = floc(l1,l2,l3)
-          !bispectrum(1,l2,l3) = floc(l1,l2,l3)
-          !write(*,*) bispectrum(1,l2,l3),bispectrum(1,l3,l2),floc(l1,l2,l3),floc(l1,l3,l2)
-       enddo
-    enddo
+     do l2 = lmin, lmax
+        max_l = min(lmax,l1a+l2)
+        min_l = max(abs(l1a-l2),lmin)  
+        do l3 = min_l,max_l,1
+           call permuteBis(bispectrum_ISWlens,minfields,nfields,l2,l3)
+           call permuteBis(bispectrum,minfields,nfields,l2,l3)
+           !write(*,*) l2,l3 bispectrum(1,1,1,l2,l3),bispectrum(1,1,1,l3,l2)
+           ! bispectrum(1,l3,l2) = bispectrum(1,l2,l3)
+           ! bispectrum_ISWlens(1,l3,l2) = bispectrum_ISWlens(1,l2,l3)
+           !bispectrum(1,l3,l2) = floc(l1,l2,l3)
+           !bispectrum(1,l2,l3) = floc(l1,l2,l3)
+           !write(*,*) bispectrum(1,l2,l3),bispectrum(1,l3,l2),floc(l1,l2,l3),floc(l1,l3,l2)
+        enddo
+     enddo
 
 
 
      !$OMP PARALLEL DO DEFAUlT(SHARED),SCHEDULE(dynamic) &
-     !$OMP PRIVATE(l1b,l2a,l3a,l2b,l3b,l3almax,l3almin,l3blmin,l3blmax,j,k,m,n), &
-     !$OMP PRIVATE(fnl,fnlb,phi23a,phi23b,signsq,phi21a,phi31a,phi21b,phi31b,phi2a3b,phi2b3a,nPhia,nPhib,dPhia,dPhib), &
-     !$OMP PRIVATE(phi2a2b,phi3a3b,l2dotl3a,l2dotl3b,l2adotl3b,l2bdotl3a,l3adotl3b,l2adotl2b,phi21amax,phi21bmax,phi21amin,phi21bmin), &
-     !$OMP PRIVATE(absl2al3b,absl2al2b,absl3al3b,absl2bl3a,DB,DSNonGauss,DSNGauss,l1dotl2a,l1adotl2b), &
+     !$OMP PRIVATE(l2a,l3a,l2b,l3b,phi21a,phi21b,phi21amax,phi21bmax,phi21amin,phi21bmin,j,k,m,n), &
+     !$OMP PRIVATE(fnl,fnlb,signsq), &
+     !$OMP PRIVATE(phi23a,phi23b,phi31a,phi31b,phi2a3b,phi2b3a,phi2a2b,phi3a3b,nPhia,nPhib,dPhia,dPhib), &
+     !$OMP PRIVATE(l1dotl2a,l1adotl2b,l2dotl3a,l2dotl3b,l2adotl3b,l2bdotl3a,l3adotl3b,l2adotl2b), &
+     !$OMP PRIVATE(absl2al3b,absl2al2b,absl3al3b,absl2bl3a,DB, DSNonGauss, DSNGauss, measureG, measureNG), &
      !$OMP REDUCTION(+:SumGauss,SumNGauss,SumNGaussAll)
      do j = imin, intmax !l3 loop
-     !do l3a = lmin, lmax   
+        !do l3a = lmin, lmax   
         l2a = ellar(j)
         !set minimum and max values of third leg (triangle constraint)
-        l3almax = min(l2a+l1a,lmax)
-        l3almin = max(abs(l2a-l1a),lmin)
+        !l3almax = min(l2a+l1a,lmax)
+        !l3almin = max(abs(l2a-l1a),lmin)
 
-
+        !number of steps
         nPhia = nPhi!min(l3almax-l3almin,nPhi)
-        ! if (abs(l2a-l1a) .gt. lmin) then
-        !   phi21amin = 0
-        ! else
-        !   phi21amin = angle(l1a,l2a,lmin)
-        ! endif
-        
-        ! if ((l2a+l1a) .gt. lmax) then
-        !   phi21amax = angle(l1a,l2a,lmax)
-        ! else
-        !   phi21amax = pi
-        ! endif
-        phi21amin = -pi
+
+        !phi21amin = -pi
+        phi21amin = 0.d0
+!!$        if (abs(l2a-l1a) .gt. lmin) then
+!!$           phi21amin = 0.d0
+!!$        else
+!!$           phi21amin = angle(l1a,l2a,lmin)
+!!$        endif
         phi21amax = pi
+
+        !deltaphi
         dPhia = (phi21amax-phi21amin)/nPhia
 
-        do m = 0,max(nPhia-1,0)
-            phi21a = dPhia*m+phi21amin
-            l3a = nint(length(l1a,l2a,phi21a))
-            phi23a = angle(l2a,l3a,l1a)
-            if ((l3a .lt. lmin) .or. (l3a .gt. lmax)) then
-              !   write(*,*), lmin,lmax,l1a,l2a,l3a
-                 cycle
-            endif            
-        !do l3a = l3almin, l3almax, stp
+        do m = 0, max(nPhia,0) !phi21a loop
+           phi21a = dPhia*m+phi21amin
 
-           !angle between l2 and l3
-           !phi23a = angle(l2a,l3a,l1a)
-           !inner products:
-           !l2dotl3a = l2a*l3a*cos(phi23a) !l2.l3
+           l3a = nint(length(l1a,l2a,phi21a))
+           if ((l3a .lt. lmin) .or. (l3a .gt. lmax)) then
+              !   write(*,*), lmin,lmax,l1a,l2a,l3a
+              cycle
+           endif
            l1dotl2a = l1a*l2a*cos(phi21a)
 
+           if(l1dotl2a .ne. l1dotl2a) write(*,*) 'NANs'
+
            !other angles; needed for 11 permutations 
-           !phi21a = angle(l1a,l2a,l3a)
+           phi23a = angle(l2a,l3a,l1a)
            phi31a = pi - phi23a - phi21a
 
            !get the SW bispectrum for the triplet (l1, l2 ,l3)
            !fnl = floc(l1a, l2a,l3a)
            fnl = bispectrum(1,1,1,l2a,l3a)
-                                      
-           !Eauate the l1 and l1'
-           l1b = l1a
-           !l2b can max be size of l1 (or l1'). Can be small, given l3
-           !il2max =
-           do k = imin, intmax
-              l2b = ellar(k)
-           !do k = imin, intmax !l2' loop
-           !   l2b = ellar(k)
 
-              !minimum value is contraint to
-              l3blmin = max(abs(l1b-l2b),lmin)
-              !maximum:
-              l3blmax = min(l1b+l2b,lmax)
+           !Eauate the l1 and l1'
+           
+
+           do k = imin, intmax
+
+              l2b = ellar(k)
+
               nPhib = nPhi
 
-              !do l3b = l3blmin, l3blmax, stp !final loop: l3'
-              ! nPhib = nPhi!min(l3blmax-l3blmin,nPhi)
-              ! if (abs(l2b-l1b) .gt. lmin) then
-              !   phi21bmin = 0
-              ! else
-              !   phi21bmin = angle(l1b,l2b,lmin)
-              ! endif
-              
-              ! if ((l2b+l1b) .gt. lmax) then
-              !   phi21bmax = angle(l1b,l2b,lmax)
-              ! else
-              !   phi21bmax = pi
-              ! endif
-              phi21bmin = -pi
+              !phi21bmin = -pi
+              phi21bmin = 0.d0
+!!$              if (abs(l2b-l1b) .gt. lmin) then
+!!$                 phi21bmin = 0
+!!$              else
+!!$                 phi21bmin = angle(l1b,l2b,lmin)
+!!$              endif
               phi21bmax = pi
+              
               dPhib = (phi21bmax-phi21bmin)/nPhib
-              do n = 0,max(nPhib-1,0)
+!!$              
+              do n = 0, max(nPhib,0)
 
-                  phi21b = dPhib*n+phi21bmin
-                  l3b = nint(length(l1b,l2b,phi21b))
-                  if ((l3b.lt. lmin) .or. (l3b .gt. lmax)) then
+                 phi21b = dPhib*n+phi21bmin
+                 l3b = nint(length(l1b,l2b,phi21b))
+                 if ((l3b .lt. lmin) .or. (l3b .gt. lmax)) then
                     cycle
-                  endif 
+                 endif
+                 l1adotl2b = l1a*l2b*cos(phi21b)
+                 if(l1adotl2b .ne. l1adotl2b) write(*,*) 'NANs'
                  !prime triangle angle between l2' and l3'
                  phi23b = angle(l2b,l3b,l1b)
+                 phi31b = pi - phi23b - phi21b
 
                  !compute fnl^2
                  fnlb = bispectrum(1,1,1,l2b,l3b)
-                 signsq = fnl*fnlb!floc(l1b,l2b,l3b)
+                 signsq = fnl*fnlb
 
                  !other angles; needed for 11 permutations 
-                 !phi21b = angle(l1b,l2b,l3b)
-                 l1adotl2b = l1a*l2b*cos(phi21b)
-                 phi31b = pi - phi23b - phi21b
+                 !phi21b = angle(l1b,l2b,l3b)                
 
                  phi2a3b =  phi21a + phi31b !correct direction
                  phi2b3a =  phi21b + phi31a
@@ -473,16 +459,7 @@ program FlatSky
 
                  ! absl2al3b = nint(length(l2a,l3b,phi2a3b)) !|l2+l3'|
                  ! absl2bl3a = nint(length(l2b,l3a,phi2b3a)) !|l2'+l3|
-!!$                 
-!!$                 
-!!$
-                ! if (absl2al3b .ne. absl2bl3a) then
-                !   write (*,*) absl2bl3a,absl2al3b
-                ! endif
-                ! if (absl2al2b .ne. absl3al3b) then
-                !   write (*,*) 'p2', absl2al2b,absl3al3b
-                ! endif
-                  
+
                  !if(absl2bl3a .lt. lmin) absl2bl3a = lmin
                  !if(absl2al2b .lt. lmin) absl2al2b = lmin
 
@@ -491,11 +468,8 @@ program FlatSky
 !!$                 
                  !3 unique terms 
                  DB(1) =  Cll(1,l1a)*Cll(1,l2a)*Cll(1,l2b)*pClpp(1,l1a)* &
-                                !(l2a**2+l2dotl3a)*(l2b**2+l2dotl3b)
                       (l1adotl2b*l1dotl2a)
-                 !write(*,*) l2a, DB(1)
-!!$
-!!$                 
+
                  ! if(absl2bl3a .lt. lmin .or. absl2bl3a .gt. lmax) then
                  !    DB(2) = 0.d0
                  ! else                    
@@ -508,31 +482,24 @@ program FlatSky
                  !    DB(3) = (Cll(1,l1a)*Cll(1,l2b)*Cll(1,l3b)*pClpp(1,absl2al2b)* &
                  !         (l3b**2-l3adotl3b)*(l2b**2-l2adotl2b))       
                  ! endif
-!!$                          
-!!$
+
                  ! 2 * pi (from phi integral) / pi - from delta 0
-                 DSNonGauss = 2.*signsq*Sum(DB(1:1))/Cll(1,l1a)**2/Cll(1,l2a)/Cll(1,l2b)/Cll(1,l3a)/Cll(1,l3b)/(2.*pi)**4 *dellar(i)*dellar(j)*dellar(k)*(stp)**2*l1a*l2a*dPhia*l2b*dPhib
-!!$
-!!$                 !if (((l2a.eq.l2b) .and. (l3a .eq.l3b)) .or. ((l2a.eq.l3b) .and. (l3a .eq.l2b))) then
-                 if (((l2a.eq.l2b) .and. (phi21a .eq.phi21b))) then
-                    DSNGauss = 2.*signsq/Cll(1,l1a)/Cll(1,l2a)/Cll(1,l3a)/6./(2.*pi)**2 *dellar(i)*dellar(j)*stp*l1a*l2a*dPhia
-                    !<N^2> + delta <N^2>
-                 else
-                    DSNGauss = 0.d0
-                    !<N^2> + delta <N^2>
+                 measureNG = 2*pi*dellar(i)*dellar(j)*dellar(k)*l1a*l2a*dPhia*l2b*dPhib
+                 DSNonGauss = 4.*measureNG*signsq*Sum(DB(1:1))/Cll(1,l1a)**2/Cll(1,l2a)/Cll(1,l2b)/Cll(1,l3a)/Cll(1,l3b)/(2.*pi)**4/pi
 
-                 endif
-                 SumGauss = SumGauss + DSNGauss
-                 SumNGauss =  SumNGauss + DSNGauss + DSNonGauss
+                 SumNGauss =  SumNGauss + DSNonGauss
 
-                 ! DSNonGauss = 2.*signsq*Sum(DB(1:3))/Cll(1,l1a)**2/Cll(1,l2a)/Cll(1,l2b)/Cll(1,l3a)/Cll(1,l3b)/(2.*pi)**4 *dellar(i)*dellar(j)*dellar(k)*(stp)**2*l1a*l2a*dPhia*l2b*dPhib
+                 SumNGaussAll =  SumNGaussAll + DSNonGauss
 
-                 ! SumNGaussAll =  SumNGaussAll + DSNGauss + DSNonGauss
-
-              enddo !l3b
+              enddo !phi12b
 
            enddo !l2b
-        enddo !l1a
+           measureG = 2*pi*dellar(i)*dellar(j)*l1a*l2a*dPhia
+           DSNGauss = 2.*measureG*fnl**2/Cll(1,l1a)/Cll(1,l2a)/Cll(1,l3a)/6./(2.*pi)**2/pi 
+           SumGauss = SumGauss + DSNGauss
+           SumNGauss =  SumNGauss + DSNGauss
+           SumNGaussAll =  SumNGaussAll  + DSNGauss
+        enddo !phi12a
      enddo !l3a
      !$OMP END PARAllEl DO
 
@@ -540,12 +507,11 @@ program FlatSky
      deallocate(bispectrum)
      deallocate(bis_ISWlens)
      deallocate(bispectrum_ISWlens)
-     write(*,*) 'l1 = ', l1a, SumGauss, SumNGauss, SumNGaussAll, sqrt(SumGauss/SumNGauss), sqrt(SumGauss/SumNGaussAll)
-  enddo !l2a
+     write(*,'(A5,I4,5E18.7)') 'l1 = ', l1a, SumGauss, SumNGauss, SumNGaussAll, sqrt(SumGauss/SumNGauss), sqrt(SumGauss/SumNGaussAll)
+  enddo !l1a
 
-  write(*,'(I4,4E17.8)') lmax, SumGauss, SumNGauss, SumNGaussAll, sqrt(SumGauss/SumNGauss), sqrt(SumGauss/SumNGaussAll)
-  write(*,'(A12,X,I4,X,A19,X,F11.3)') 'For lmax = ',  lmax, 'the error on fnl = ', sqrt(1./SumGauss)
-
+  write(*,'(I4,5E17.8)') lmax, SumGauss, SumNGauss, SumNGaussAll, sqrt(SumGauss/SumNGauss), sqrt(SumGauss/SumNGaussAll)
+  write(*,'(A12,X,I4,X,A19,X,F11.3,X, A27,X,F11.4,A1)') 'For lmax = ',  lmax, 'the error on fnl = ', sqrt(1./SumGauss), 'error with full sky result:', 100*sqrt(TotSumCV/SumGauss)-100,'%'
   close(12)
   deallocate(Cl, Cll, pClpp,invCll,Cllm)
 contains
@@ -632,7 +598,7 @@ contains
                 do q1 = minfields,nfields
                    do q2 = minfields,nfields
                       tmpBis(q1,p1,m1) = tmpBis(q1,p1,m1) +invCl(q1,q2,l1)*invCl(p1,p2,l2)*invCl(m1,m2,l3)*bispectrum(q2,p2,m2,l2,l3)
-                  enddo
+                   enddo
                 enddo
              enddo
           enddo
@@ -641,7 +607,7 @@ contains
     bispectrum(:,:,:,l2,l3) = tmpBis(:,:,:)
   end subroutine applyInvC
 
-subroutine allocate_besseltransforms(P,alphabetafile,alphabetaPolfile,Cllfile,pClfile)
+  subroutine allocate_besseltransforms(P,alphabetafile,alphabetaPolfile,Cllfile,pClfile)
     character(120),intent(in) :: alphabetafile, alphabetaPolfile,Cllfile,pClfile
     type(bfs) :: P
     character(120) :: alphaTfile, betaTfile, alphaEfile, betaEfile, rfile
@@ -667,51 +633,51 @@ subroutine allocate_besseltransforms(P,alphabetafile,alphabetaPolfile,Cllfile,pC
     write(clmax, form)  dlmax
     if (P%flagDoWigner .eq. 3) then
 
-      allocate(P%Cll(4,2:5000))
-      ! Cllfile = trim(Folder1)//trim('SOspectra_lensedCls.dat')
-      open(unit=18,file = Cllfile, status='old')
-      do j = 1, 5000
-         !#    L    TT             EE             BB             TE 
-         if (j .eq. 1) then
-            read(18,*)
-            cycle
-         endif
-         read(18,*) ell, tmpCll(1:4,j)
-         P%Cll(1,j) = 2.*pi*tmpCll(1,j)/(real(ell,dl)*(real(ell,dl)+1.))/CMB2COBEnorm
-         P%Cll(2,j) = 2.*pi*tmpCll(4,j)/(real(ell,dl)*(real(ell,dl)+1.))/CMB2COBEnorm
-         P%Cll(3,j) = 2.*pi*tmpCll(2,j)/(real(ell,dl)*(real(ell,dl)+1.))/CMB2COBEnorm
-         P%Cll(4,j) = 2.*pi*tmpCll(3,j)/(real(ell,dl)*(real(ell,dl)+1.))/CMB2COBEnorm
-         !write(*,*) l1,Cll(1:4,j) 
-      enddo  
-      close(18)
+       allocate(P%Cll(4,2:5000))
+       ! Cllfile = trim(Folder1)//trim('SOspectra_lensedCls.dat')
+       open(unit=18,file = Cllfile, status='old')
+       do j = 1, 5000
+          !#    L    TT             EE             BB             TE 
+          if (j .eq. 1) then
+             read(18,*)
+             cycle
+          endif
+          read(18,*) ell, tmpCll(1:4,j)
+          P%Cll(1,j) = 2.*pi*tmpCll(1,j)/(real(ell,dl)*(real(ell,dl)+1.))/CMB2COBEnorm
+          P%Cll(2,j) = 2.*pi*tmpCll(4,j)/(real(ell,dl)*(real(ell,dl)+1.))/CMB2COBEnorm
+          P%Cll(3,j) = 2.*pi*tmpCll(2,j)/(real(ell,dl)*(real(ell,dl)+1.))/CMB2COBEnorm
+          P%Cll(4,j) = 2.*pi*tmpCll(3,j)/(real(ell,dl)*(real(ell,dl)+1.))/CMB2COBEnorm
+          !write(*,*) l1,Cll(1:4,j) 
+       enddo
+       close(18)
     endif
     if (P%flagDoWigner .eq. 5) then
 
-      allocate(P%Cll(2:4,2:5000))
-      allocate(P%pCll(4,2:5000))
-      ! Cllfile = trim(Folder1)//trim('SOspectra_lensedCls.dat')
-      open(unit=17,file = pClfile, status='old')
-      open(unit=18,file = Cllfile, status='old')
-      do j = 1, 5000
-         !#    L    TT             EE             BB             TE             PP             TP             EP
-         !#    L    TT             EE             BB             TE 
-         if (j .eq. 1) then
-            read(17,*)
-            read(18,*)
-            cycle
-         endif
-         read(17,*) ell, tmpCll(1:4,j),P%pCll(1:3,j)
-         read(18,*) ell, tmpCll(1:4,j)
-         P%pCll(1,j) = 2.*pi*P%pCll(1,j)/(real(ell,dl)*(real(ell,dl)+1.))**2
-         P%pCll(2:3,j) = 2.*pi*P%pCll(2:3,j)/(real(ell,dl)*(real(ell,dl)+1.))**(3.d0/2.d0)/CMB2COBEnorm**(1./2)
+       allocate(P%Cll(2:4,2:5000))
+       allocate(P%pCll(4,2:5000))
+       ! Cllfile = trim(Folder1)//trim('SOspectra_lensedCls.dat')
+       open(unit=17,file = pClfile, status='old')
+       open(unit=18,file = Cllfile, status='old')
+       do j = 1, 5000
+          !#    L    TT             EE             BB             TE             PP             TP             EP
+          !#    L    TT             EE             BB             TE 
+          if (j .eq. 1) then
+             read(17,*)
+             read(18,*)
+             cycle
+          endif
+          read(17,*) ell, tmpCll(1:4,j),P%pCll(1:3,j)
+          read(18,*) ell, tmpCll(1:4,j)
+          P%pCll(1,j) = 2.*pi*P%pCll(1,j)/(real(ell,dl)*(real(ell,dl)+1.))**2
+          P%pCll(2:3,j) = 2.*pi*P%pCll(2:3,j)/(real(ell,dl)*(real(ell,dl)+1.))**(3.d0/2.d0)/CMB2COBEnorm**(1./2)
 
-         P%Cll(2,j) = 2.*pi*tmpCll(1,j)/(real(ell,dl)*(real(ell,dl)+1.))/CMB2COBEnorm
-         P%Cll(3,j) = 2.*pi*tmpCll(4,j)/(real(ell,dl)*(real(ell,dl)+1.))/CMB2COBEnorm
-         P%Cll(4,j) = 2.*pi*tmpCll(2,j)/(real(ell,dl)*(real(ell,dl)+1.))/CMB2COBEnorm
-         !write(*,*) l1,Cll(1:4,j) 
-      enddo  
-      close(17)
-      close(18)
+          P%Cll(2,j) = 2.*pi*tmpCll(1,j)/(real(ell,dl)*(real(ell,dl)+1.))/CMB2COBEnorm
+          P%Cll(3,j) = 2.*pi*tmpCll(4,j)/(real(ell,dl)*(real(ell,dl)+1.))/CMB2COBEnorm
+          P%Cll(4,j) = 2.*pi*tmpCll(2,j)/(real(ell,dl)*(real(ell,dl)+1.))/CMB2COBEnorm
+          !write(*,*) l1,Cll(1:4,j) 
+       enddo
+       close(17)
+       close(18)
     endif
     !locate alpha,beta,gamma,delta files
     !alphabetafile = 'alphabeta/l_r_alpha_beta_new_Lmax'//trim(clmax)//'.txt' 
@@ -725,68 +691,68 @@ subroutine allocate_besseltransforms(P,alphabetafile,alphabetaPolfile,Cllfile,pC
     !alphabetaPolfile = '/Volumes/wCoulton2TB/nonGaus/Data/alphaBetaDir/l_r_alpha_beta_Pol.txt.MAX4000'
 
     if ((P%flagDoWigner .eq. 0) .or. (P%flagDoWigner .eq. 1) ) then
-      open(unit=FileUnit,file = trim(alphabetafile), status='old')
-      open(unit=FileUnit+1,file = trim(alphabetaPolfile), status='old')
-      !reading in header (nice illustration of the limitations of Fortran)
-      !blank line
-      write(*,*)
-      do i=1,3
-         !alpha/beta file, show header:
-         read(FileUnit,'(1A70)') header
-         if(i .eq. 1 .or. i .eq. 2) write(*,*) trim(header)
-      enddo
-      write(*,*)
-          dimr = 438
+       open(unit=FileUnit,file = trim(alphabetafile), status='old')
+       open(unit=FileUnit+1,file = trim(alphabetaPolfile), status='old')
+       !reading in header (nice illustration of the limitations of Fortran)
+       !blank line
+       write(*,*)
+       do i=1,3
+          !alpha/beta file, show header:
+          read(FileUnit,'(1A70)') header
+          if(i .eq. 1 .or. i .eq. 2) write(*,*) trim(header)
+       enddo
+       write(*,*)
+       dimr = 438
 
-      do i=1,3
-         !gamma/delta file, skip header:
-         read(FileUnit+1,'(1A70)') header
-      enddo
+       do i=1,3
+          !gamma/delta file, skip header:
+          read(FileUnit+1,'(1A70)') header
+       enddo
 
-      allocate(P%rarray(dimr), P%deltar(dimr))
+       allocate(P%rarray(dimr), P%deltar(dimr))
 
-      allocate(P%ar(dimr,2:dlmax,2))
-      allocate(P%br(dimr,2:dlmax,2))
-      allocate(P%gr(dimr,2:dlmax,2))
-      allocate(P%dr(dimr,2:dlmax,2))
+       allocate(P%ar(dimr,2:dlmax,2))
+       allocate(P%br(dimr,2:dlmax,2))
+       allocate(P%gr(dimr,2:dlmax,2))
+       allocate(P%dr(dimr,2:dlmax,2))
 
-      !read
-      write(*,*) 'reading alpha/beta/gamma/delta files ...'
-      write(*,*) ' Will altered this. I get from camb only 438 points instead of 603 points'
-      write(*,*) ' commented out some statements in get_bispectrum. Maybe put them here for clarity?'
-      write(*,*) ' altered get_bispectrum now prefactor and wigners are squared.'
-      do ell = 2, dlmax
-         do i  = 1, dimr
-            read(FileUnit,*) ellr, P%rarray(i), P%deltar(i), P%ar(i,ell,1), P%br(i,ell,1) , P%gr(i,ell,1), P%dr(i,ell,1)
-            read(FileUnit+1,*) ellr, P%rarray(i), P%deltar(i), P%ar(i,ell,2), P%br(i,ell,2) , P%gr(i,ell,2), P%dr(i,ell,2)
-            !polarization alpha,beta,gamma,delta need factor ((l-2)!/(l+2)!^)1/2
-            !P%br(i,ell,2) = sqrt((ell-1d0)*ell*(ell+1d0)*(ell+2d0))*P%br(i,ell,2)
-            !P%ar(i,ell,2) = sqrt((ell-1d0)*ell*(ell+1d0)*(ell+2d0))*P%ar(i,ell,2)
-            !P%gr(i,ell,2) = sqrt((ell-1d0)*ell*(ell+1d0)*(ell+2d0))*P%gr(i,ell,2)
-            !P%dr(i,ell,2) = sqrt((ell-1d0)*ell*(ell+1d0)*(ell+2d0))*P%dr(i,ell,2)
-            !write(*,*) ell, rarray(i), deltar(i), ar(i,l1,1), br(i,l1,1) , ar(i,l1,2), br(i,l1,2)
-         enddo
-      enddo
-      close(FileUnit)
-      close(FileUnit+1)
-      write(*,*) 'reading complete'
+       !read
+       write(*,*) 'reading alpha/beta/gamma/delta files ...'
+       write(*,*) ' Will altered this. I get from camb only 438 points instead of 603 points'
+       write(*,*) ' commented out some statements in get_bispectrum. Maybe put them here for clarity?'
+       write(*,*) ' altered get_bispectrum now prefactor and wigners are squared.'
+       do ell = 2, dlmax
+          do i  = 1, dimr
+             read(FileUnit,*) ellr, P%rarray(i), P%deltar(i), P%ar(i,ell,1), P%br(i,ell,1) , P%gr(i,ell,1), P%dr(i,ell,1)
+             read(FileUnit+1,*) ellr, P%rarray(i), P%deltar(i), P%ar(i,ell,2), P%br(i,ell,2) , P%gr(i,ell,2), P%dr(i,ell,2)
+             !polarization alpha,beta,gamma,delta need factor ((l-2)!/(l+2)!^)1/2
+             !P%br(i,ell,2) = sqrt((ell-1d0)*ell*(ell+1d0)*(ell+2d0))*P%br(i,ell,2)
+             !P%ar(i,ell,2) = sqrt((ell-1d0)*ell*(ell+1d0)*(ell+2d0))*P%ar(i,ell,2)
+             !P%gr(i,ell,2) = sqrt((ell-1d0)*ell*(ell+1d0)*(ell+2d0))*P%gr(i,ell,2)
+             !P%dr(i,ell,2) = sqrt((ell-1d0)*ell*(ell+1d0)*(ell+2d0))*P%dr(i,ell,2)
+             !write(*,*) ell, rarray(i), deltar(i), ar(i,l1,1), br(i,l1,1) , ar(i,l1,2), br(i,l1,2)
+          enddo
+       enddo
+       close(FileUnit)
+       close(FileUnit+1)
+       write(*,*) 'reading complete'
     endif
-    
+
   end subroutine allocate_besseltransforms
 
   subroutine deallocate_besseltransforms(P)
     type(bfs) :: P
     if ((P%flagDoWigner .eq. 0) .or. (P%flagDoWigner .eq. 1)) then 
-      deallocate(P%ar,P%br,P%gr,P%dr)
-      deallocate(P%rarray, P%deltar)
+       deallocate(P%ar,P%br,P%gr,P%dr)
+       deallocate(P%rarray, P%deltar)
     elseif (P%flagDoWigner.eq.3) then
-      deallocate(P%Cll)
+       deallocate(P%Cll)
     elseif (P%flagDoWigner.eq.5) then
-      deallocate(P%Cll)
-      deallocate(P%pCll)
+       deallocate(P%Cll)
+       deallocate(P%pCll)
     endif
   end subroutine deallocate_besseltransforms
-  
+
   subroutine get_bispectrum_sss(PQ,l1,l2,ellmin,ellmax,shape,nfields,bis)  
     !opening file params 
 
@@ -822,7 +788,7 @@ subroutine allocate_besseltransforms(P,alphabetafile,alphabetaPolfile,Cllfile,pC
     integer :: irmin, irmax, ch1, ch2
     logical :: lim_r_samp = .false.
 
-    
+
     !lmin is not working yet (keep 2)
     lmin = ellmin
 
@@ -875,28 +841,28 @@ subroutine allocate_besseltransforms(P,alphabetafile,alphabetaPolfile,Cllfile,pC
     irmax = 1
     !if limiting, change irmin and irmax
     if (((PQ%flagDoWigner .eq. 0 ).or. (PQ%flagDoWigner .eq. 1)) .and. shape .ne. 5) then
-      if(lim_r_samp) then
-         !write(*,*) 'limiting integration in r. 99% accuracy'
-         do i  = 1, dimr
-            !locate rmin and rmax
-            if (PQ%rarray(i) .le. rmin .and. ch1 .eq. 1) then
-               irmin = i
-               ch1 = 0
-            endif
-            if (PQ%rarray(i) .le. rmax .and. ch2 .eq. 1) then
-               irmax = i
-               ch2 = 0
-            endif
-            !write(*,*) 'using only', irmin - irmax, 'instead of', dimr, 'points' 
-         enddo
-         !write(*,*) 'using only', irmin - irmax, 'instead of', dimr, 'points'
-      endif
+       if(lim_r_samp) then
+          !write(*,*) 'limiting integration in r. 99% accuracy'
+          do i  = 1, dimr
+             !locate rmin and rmax
+             if (PQ%rarray(i) .le. rmin .and. ch1 .eq. 1) then
+                irmin = i
+                ch1 = 0
+             endif
+             if (PQ%rarray(i) .le. rmax .and. ch2 .eq. 1) then
+                irmax = i
+                ch2 = 0
+             endif
+             !write(*,*) 'using only', irmin - irmax, 'instead of', dimr, 'points' 
+          enddo
+          !write(*,*) 'using only', irmin - irmax, 'instead of', dimr, 'points'
+       endif
     endif
     min_l = max(abs(l1-l2),l2)
 
     max_l = min(ellmax,l1+l2)
     !you can set the wigners to 1 here if you want them to be excluded (I think you still need 0.5 below though)
-    
+
 
 
     !$OMP parallel do private(p,i, j, k,abint,Btemp,l3,fcnt) shared(PQ,irmax,irmin,bis,nfields,shape,local,equil,ortho,l1,l2,min_l,max_l)
@@ -907,48 +873,48 @@ subroutine allocate_besseltransforms(P,alphabetafile,alphabetaPolfile,Cllfile,pC
              do k = minfields,nfields !T,E
                 Btemp = 0.d0
                 if ((PQ%flagDoWigner .eq. 0 ).or. (PQ%flagDoWigner .eq. 1)) then
-                  if (shape .eq. 5) then
-                    Btemp = fPhiISW(l1,l2,l3,PQ%pCll(1+p,l1),PQ%Cll(k+j,l3),j)+ & 
-                            fPhiISW(l3,l2,l1,PQ%pCll(1+k,l3),PQ%Cll(p+j,l1),j)+ & 
-                            fPhiISW(l2,l1,l3,PQ%pCll(1+j,l2),PQ%Cll(k+p,l3),p)+ & 
-                            fPhiISW(l3,l1,l2,PQ%pCll(1+k,l3),PQ%Cll(j+p,l2),p)+ & 
-                            fPhiISW(l2,l3,l1,PQ%pCll(1+j,l2),PQ%Cll(p+k,l1),k)+ & 
-                            fPhiISW(l1,l3,l2,PQ%pCll(1+p,l1),PQ%Cll(j+k,l2),k)
-                    Btemp = Btemp/2.
-                  else if (shape .eq. 6) then
-                    Btemp = floc(l1,l2,l3)
-                  else
-                    do i = irmax, irmin !rmini, rmaxi !
-                       if (shape .eq. local) then 
-                          abint = PQ%br(i,l1,p)*PQ%br(i,l2,j)*PQ%ar(i,l3,k) + &
-                               PQ%br(i,l3,k)*PQ%br(i,l1,p)*PQ%ar(i,l2,j) + &
-                               PQ%br(i,l2,j)*PQ%br(i,l3,k)*PQ%ar(i,l1,p)
-                       elseif (shape .eq. equil) then
-                          abint = -3.*( PQ%br(i,l1,p)*PQ%br(i,l2,j)*PQ%ar(i,l3,k) + &
-                               PQ%br(i,l3,k)*PQ%br(i,l1,p)*PQ%ar(i,l2,j) + &
-                               PQ%br(i,l2,j)*PQ%br(i,l3,k)*PQ%ar(i,l1,p)) + &
-                               (-6.)*(PQ%dr(i,l1,p)*PQ%dr(i,l2,j)*PQ%dr(i,l3,k)) + &
-                               (+3.)*(PQ%gr(i,l1,p)*PQ%dr(i,l2,j) + PQ%gr(i,l2,j)*PQ%dr(i,l1,p))*PQ%br(i,l3,k) + &
-                               (+3.)*(PQ%dr(i,l1,p)*PQ%br(i,l2,j) + PQ%dr(i,l2,j)*PQ%br(i,l1,p))*PQ%gr(i,l3,k) + &
-                               (+3.)*(PQ%gr(i,l1,p)*PQ%br(i,l2,j) + PQ%gr(i,l2,j)*PQ%br(i,l1,p))*PQ%dr(i,l3,k) 
-                       elseif (shape .eq. ortho) then
-                          abint = -9.*( PQ%br(i,l1,p)*PQ%br(i,l2,j)*PQ%ar(i,l3,k) + &
-                               PQ%br(i,l3,k)*PQ%br(i,l1,p)*PQ%ar(i,l2,j) + &
-                               PQ%br(i,l2,j)*PQ%br(i,l3,k)*PQ%ar(i,l1,p)) + &
-                               (-24.)*(PQ%dr(i,l1,p)*PQ%dr(i,l2,j)*PQ%dr(i,l3,k)) + &
-                               (+9.)*(PQ%gr(i,l1,p)*PQ%dr(i,l2,j) + PQ%gr(i,l2,j)*PQ%dr(i,l1,p))*PQ%br(i,l3,k) + &
-                               (+9.)*(PQ%dr(i,l1,p)*PQ%br(i,l2,j) + PQ%dr(i,l2,j)*PQ%br(i,l1,p))*PQ%gr(i,l3,k) + &
-                               (+9.)*(PQ%gr(i,l1,p)*PQ%br(i,l2,j) + PQ%gr(i,l2,j)*PQ%br(i,l1,p))*PQ%dr(i,l3,k) 
-                       elseif (shape .eq. folded) then
-                       endif
+                   if (shape .eq. 5) then
+                      Btemp = fPhiISW(l1,l2,l3,PQ%pCll(1+p,l1),PQ%Cll(k+j,l3),j)+ & 
+                           fPhiISW(l3,l2,l1,PQ%pCll(1+k,l3),PQ%Cll(p+j,l1),j)+ & 
+                           fPhiISW(l2,l1,l3,PQ%pCll(1+j,l2),PQ%Cll(k+p,l3),p)+ & 
+                           fPhiISW(l3,l1,l2,PQ%pCll(1+k,l3),PQ%Cll(j+p,l2),p)+ & 
+                           fPhiISW(l2,l3,l1,PQ%pCll(1+j,l2),PQ%Cll(p+k,l1),k)+ & 
+                           fPhiISW(l1,l3,l2,PQ%pCll(1+p,l1),PQ%Cll(j+k,l2),k)
+                      Btemp = Btemp/2.
+                   else if (shape .eq. 6) then
+                      Btemp = floc(l1,l2,l3)
+                   else
+                      do i = irmax, irmin !rmini, rmaxi !
+                         if (shape .eq. local) then 
+                            abint = PQ%br(i,l1,p)*PQ%br(i,l2,j)*PQ%ar(i,l3,k) + &
+                                 PQ%br(i,l3,k)*PQ%br(i,l1,p)*PQ%ar(i,l2,j) + &
+                                 PQ%br(i,l2,j)*PQ%br(i,l3,k)*PQ%ar(i,l1,p)
+                         elseif (shape .eq. equil) then
+                            abint = -3.*( PQ%br(i,l1,p)*PQ%br(i,l2,j)*PQ%ar(i,l3,k) + &
+                                 PQ%br(i,l3,k)*PQ%br(i,l1,p)*PQ%ar(i,l2,j) + &
+                                 PQ%br(i,l2,j)*PQ%br(i,l3,k)*PQ%ar(i,l1,p)) + &
+                                 (-6.)*(PQ%dr(i,l1,p)*PQ%dr(i,l2,j)*PQ%dr(i,l3,k)) + &
+                                 (+3.)*(PQ%gr(i,l1,p)*PQ%dr(i,l2,j) + PQ%gr(i,l2,j)*PQ%dr(i,l1,p))*PQ%br(i,l3,k) + &
+                                 (+3.)*(PQ%dr(i,l1,p)*PQ%br(i,l2,j) + PQ%dr(i,l2,j)*PQ%br(i,l1,p))*PQ%gr(i,l3,k) + &
+                                 (+3.)*(PQ%gr(i,l1,p)*PQ%br(i,l2,j) + PQ%gr(i,l2,j)*PQ%br(i,l1,p))*PQ%dr(i,l3,k) 
+                         elseif (shape .eq. ortho) then
+                            abint = -9.*( PQ%br(i,l1,p)*PQ%br(i,l2,j)*PQ%ar(i,l3,k) + &
+                                 PQ%br(i,l3,k)*PQ%br(i,l1,p)*PQ%ar(i,l2,j) + &
+                                 PQ%br(i,l2,j)*PQ%br(i,l3,k)*PQ%ar(i,l1,p)) + &
+                                 (-24.)*(PQ%dr(i,l1,p)*PQ%dr(i,l2,j)*PQ%dr(i,l3,k)) + &
+                                 (+9.)*(PQ%gr(i,l1,p)*PQ%dr(i,l2,j) + PQ%gr(i,l2,j)*PQ%dr(i,l1,p))*PQ%br(i,l3,k) + &
+                                 (+9.)*(PQ%dr(i,l1,p)*PQ%br(i,l2,j) + PQ%dr(i,l2,j)*PQ%br(i,l1,p))*PQ%gr(i,l3,k) + &
+                                 (+9.)*(PQ%gr(i,l1,p)*PQ%br(i,l2,j) + PQ%gr(i,l2,j)*PQ%br(i,l1,p))*PQ%dr(i,l3,k) 
+                         elseif (shape .eq. folded) then
+                         endif
 
-                       !1D heat map of integral to determine r values to include
-                       !cum_rint(i) = cum_rint(i) + rarray(i)**2*deltar(i)*abint
+                         !1D heat map of integral to determine r values to include
+                         !cum_rint(i) = cum_rint(i) + rarray(i)**2*deltar(i)*abint
 
-                       Btemp = Btemp + PQ%rarray(i)**2*PQ%deltar(i)*abint
+                         Btemp = Btemp + PQ%rarray(i)**2*PQ%deltar(i)*abint
 
-                    enddo !r loop
-                  endif
+                      enddo !r loop
+                   endif
                 endif
                 !means you have to recompute bispectrum elements every time, but requires low memory 
                 ! Need prefactor*a3j squared as that is what the binned function computes
@@ -956,7 +922,7 @@ subroutine allocate_besseltransforms(P,alphabetafile,alphabetaPolfile,Cllfile,pC
                 ! The prefactor factor of two is needed for local, equil and orth. But not ISW lensing or others!!!! 
                 ! I include a factor of a half above for the ISW for simplicity
                 ! One factor is needed to replace the factor missing above however the squaring introduces an extra one.
-                
+
                 bis(fcnt,l3)  = 2.0*Btemp
 
                 !write(*,*) l3, bis(fcnt,l3)
@@ -967,9 +933,9 @@ subroutine allocate_besseltransforms(P,alphabetafile,alphabetaPolfile,Cllfile,pC
              enddo !T, E loop
           enddo  !T, E loop
        enddo  !T, E loop
- 
+
     enddo !l3 loop
-   !$OMP END parallel do
+    !$OMP END parallel do
 
 
 
@@ -977,18 +943,18 @@ subroutine allocate_besseltransforms(P,alphabetafile,alphabetaPolfile,Cllfile,pC
   end subroutine get_bispectrum_sss
 
 
-real(dl) function floc(l1,l2,l3)
-   !SW approximation
-   integer :: l1, l2, l3
-   real(dl) :: amp
-   real(dl), parameter :: pi = 3.14159265359
-   real(dl) :: As = 2.1056d-9
-   !from https://arxiv.org/pdf/0812.3413.pdf Eq. 19 and 20
-   amp = (2.d0/27./pi**2)*As
-   floc = 1.d0/(l1+1.d0)/l1/l2/(l2+1.d0) + 1.d0/(l3+1.d0)/l3/l2/(l2+1.d0) + &
-        1.d0/(l1+1.d0)/l1/l3/(l3+1.d0)
-   floc = floc*amp*2.E-7 
- end function floc
+  real(dl) function floc(l1,l2,l3)
+    !SW approximation
+    integer :: l1, l2, l3
+    real(dl) :: amp
+    real(dl), parameter :: pi = 3.14159265359
+    real(dl) :: As = 2.1056d-9
+    !from https://arxiv.org/pdf/0812.3413.pdf Eq. 19 and 20
+    amp = (2.d0/27./pi**2)*As
+    floc = 1.d0/(l1+1.d0)/l1/l2/(l2+1.d0) + 1.d0/(l3+1.d0)/l3/l2/(l2+1.d0) + &
+         1.d0/(l1+1.d0)/l1/l3/(l3+1.d0)
+    floc = floc*amp*2.E-7 
+  end function floc
 
 
   real function tr(l1,l2,l3)
@@ -1003,17 +969,17 @@ real(dl) function floc(l1,l2,l3)
 
   end function tr
 
-! From https://arxiv.org/pdf/1509.08107.pdf
-real(dl) function fPhiISW(l1,l2,l3,CPT_l1,CTT_l3,p2)
-   integer :: l1, l2, l3,p2
-   real(dl) :: CPT_l1,CTT_l3
-   fPhiISW = .5*((l1+1)*l1-l2*(l2+1)+l3*(l3+1))*CPT_l1*CTT_l3
-   if (p2 .eq.2) then
-      fPhiISW = fPhiISW*((l1+1)*l1-l2*(l2+1)-l3*(l3+1))*((l1+1)*l1-l2*(l2+1)-l3*(l3+1)+2) +&
-                (-2.0)*fPhiISW*l2*(l2+1)*l3*(l3+1)
-      fPhiISW = fPhiISW / sqrt(4.*(l2-1)*l2*(l2+1)*(l2+2)*(l3-1)*l3*(l3+1)*(l3+2) )
-   endif
-end function fPhiISW
+  ! From https://arxiv.org/pdf/1509.08107.pdf
+  real(dl) function fPhiISW(l1,l2,l3,CPT_l1,CTT_l3,p2)
+    integer :: l1, l2, l3,p2
+    real(dl) :: CPT_l1,CTT_l3
+    fPhiISW = .5*((l1+1)*l1-l2*(l2+1)+l3*(l3+1))*CPT_l1*CTT_l3
+    if (p2 .eq.2) then
+       fPhiISW = fPhiISW*((l1+1)*l1-l2*(l2+1)-l3*(l3+1))*((l1+1)*l1-l2*(l2+1)-l3*(l3+1)+2) +&
+            (-2.0)*fPhiISW*l2*(l2+1)*l3*(l3+1)
+       fPhiISW = fPhiISW / sqrt(4.*(l2-1)*l2*(l2+1)*(l2+2)*(l3-1)*l3*(l3+1)*(l3+2) )
+    endif
+  end function fPhiISW
 
   real function prefactor(l1,l2,l3)
     real(dl), parameter :: pi = 3.14159265359
