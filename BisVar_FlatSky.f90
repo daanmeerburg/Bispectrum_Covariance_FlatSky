@@ -218,7 +218,7 @@ program FlatSky
 
   !intmax = 60 : lmax = 100
   !intmax = 210 : lmax = 3810
-  intmax = 210
+  intmax = 115
   imin = 39
   lmax = ellar(intmax)
   lmin = ellar(imin)
@@ -360,6 +360,7 @@ program FlatSky
      !$OMP PARALLEL DO DEFAUlT(SHARED),SCHEDULE(dynamic) &
      !$OMP PRIVATE(l2a,l3a,l2b,l3b,phi21a,phi21b,phi21amax,phi21bmax,phi21amin,phi21bmin,j,k,m,n), &
      !$OMP PRIVATE(fnl,fnlb,signsq,tempfac,tempfacFcM,DB_tmp), &
+     !$OMP PRIVATE(m1,m2,p1,p2,q1,q2), &
      !$OMP PRIVATE(phi23a,phi23b,phi31a,phi31b,phi2a3b,phi2b3a,phi2a2b,phi3a3b,nPhia,nPhib,dPhia,dPhib), &
      !$OMP PRIVATE(l1dotl2a,l1adotl2b,l2dotl3a,l2dotl3b,l2adotl3b,l2bdotl3a,l3adotl3b,l2adotl2b), &
      !$OMP PRIVATE(absl2al3b,absl2al2b,absl3al3b,absl2bl3a,DB, DSNonGauss, DSNGauss, measureG, measureNG), &
