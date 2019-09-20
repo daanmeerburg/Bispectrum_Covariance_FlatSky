@@ -505,6 +505,7 @@ program FlatSky
                    tempfacFcM(2,2) = cos(2*(phi21a+phi31a))*cos(2*(phi21b+phi31b))*tempfac
                    !write(*,*) tempfacFcM(2,2)
                  endif
+                 DSNonGauss = 0
                  do m2  = minfields,nfields !T,E (8 terms only)
                    do p2 = minfields,nfields !T,E
                       do q2 = minfields,nfields !T,E
@@ -530,6 +531,7 @@ program FlatSky
               enddo !phi12b
 
            enddo !l2b
+           DSNGauss = 0
            measureG = 2*pi*dellar(i)*dellar(j)*l1a*l2a*dPhia
            do m2  = minfields,nfields !T,E (8 terms only)
              do p2 = minfields,nfields !T,E
@@ -539,7 +541,7 @@ program FlatSky
                          do q1 = minfields,nfields !T,E
                              fnl = bispectrum(m1,p1,q1,l2a,l3a)
                              fnlb = bispectrum(m2,p2,q2,l2b,l3b)
-                             DSNGauss = 2.*measureG*fnl**2*Cllm(m1,m2,l1a)*Cllm(p1,p2,l2a)*Cllm(q1,q2,l3a)/6./(2.*pi)**2/pi 
+                             DSNGauss = DSNGauss + 2.*measureG*fnl*fnlb*Cllm(m1,m2,l1a)*Cllm(p1,p2,l2a)*Cllm(q1,q2,l3a)/6./(2.*pi)**2/pi 
                          enddo
                       enddo
                    enddo
