@@ -27,7 +27,7 @@ program FlatSky
   real(dl) :: fnl,fnlb, signsq
   real(dl) :: absl2l3a, absl2l3b, absl3al3b, absl2al2b, absl2al3b, absl2bl3a
   real(dl) :: l2dotl3a, l2dotl3b, l2adotl3b,l2bdotl3a,l3adotl3b,l2adotl2b,l1dotl2a,l1adotl2b
-  real(dl) :: DB(3)
+  real(dl) :: DB(3),DB_tmp
   real(dl) :: SumGauss, DSNGauss,  SumNGauss, DSNonGauss, SumNGaussAll, measureG, measureNG
   real(dl) :: CMB2COBEnorm = 7428350250000.d0
 
@@ -35,7 +35,7 @@ program FlatSky
   real(dl)  :: atj(0:20000),atj2(0:20000)
   real(dl), pointer :: a3j(:,:), a3joC(:,:)
   real(dl), pointer :: bispectrum(:,:,:,:,:),bispectrum_ISWlens(:,:,:,:,:), bis(:,:),bis_ISWlens(:,:)
-
+  real(dl) ::  tempfac,tempfacFcM(2,2)
   real(dl) ::  DetFishCV,TotSumCVISWLens,TotSumCV,TotSumCVLensCross,alpha,beta
   real(dl) ::  Det,DetISWLens,fnlISW,fnlISWb,TempCovCV,DetLensCross,detCovCV
 
@@ -327,14 +327,14 @@ program FlatSky
         call get_bispectrum_sss(P_ISWlens,l1a,l2,2,lmax,5,nfields,bis_ISWlens)
         call reshapeBispectrum(bis_ISWlens*.5,bispectrum_ISWlens,l2,minfields,nfields)
 
-        ! min_l = max(abs(l1a-l2),lmin) 
-        ! max_l = min(lmax,l1a+l2)
-        ! do l3=min_l,max_l,1 !sum has to be even
-        !    !write(*,'(3I4,2E18.7)') l1,l2,l3,bispectrum(1,1,1,l2,l3),bispectrum(2,2,2,l2,l3)
-        !    call applyInvC(bispectrum,invCll,minfields,nfields, l1a,l2,l3)
-        !    call applyInvC(bispectrum_ISWlens,invCll,minfields,nfields,l1a,l2,l3)
-        !    !write(*,'(3I4,2E18.7)') l1,l2,l3,bispectrum(1,1,1,l2,l3),bispectrum(2,2,2,l2,l3)
-        ! enddo
+        min_l = max(abs(l1a-l2),lmin) 
+        max_l = min(lmax,l1a+l2)
+        do l3=min_l,max_l,1 !sum has to be even
+           !write(*,'(3I4,2E18.7)') l1,l2,l3,bispectrum(1,1,1,l2,l3),bispectrum(2,2,2,l2,l3)
+           call applyInvC(bispectrum,invCll,minfields,nfields, l1a,l2,l3)
+           call applyInvC(bispectrum_ISWlens,invCll,minfields,nfields,l1a,l2,l3)
+           !write(*,'(3I4,2E18.7)') l1,l2,l3,bispectrum(1,1,1,l2,l3),bispectrum(2,2,2,l2,l3)
+        enddo
         ! write(*,*),bispectrum_ISWlens(1,1,1,l2,l3),bispectrum_ISWlens(1,1,1,l3,l2)
 
         ! bispectrum_ISWlens(1,l2,:) = bis_ISWlens(1,:)*.5 ! .5 for account for 2 in prefactor
@@ -359,7 +359,7 @@ program FlatSky
 
      !$OMP PARALLEL DO DEFAUlT(SHARED),SCHEDULE(dynamic) &
      !$OMP PRIVATE(l2a,l3a,l2b,l3b,phi21a,phi21b,phi21amax,phi21bmax,phi21amin,phi21bmin,j,k,m,n), &
-     !$OMP PRIVATE(fnl,fnlb,signsq), &
+     !$OMP PRIVATE(fnl,fnlb,signsq,tempfac,tempfacFcM,DB_tmp), &
      !$OMP PRIVATE(phi23a,phi23b,phi31a,phi31b,phi2a3b,phi2b3a,phi2a2b,phi3a3b,nPhia,nPhib,dPhia,dPhib), &
      !$OMP PRIVATE(l1dotl2a,l1adotl2b,l2dotl3a,l2dotl3b,l2adotl3b,l2bdotl3a,l3adotl3b,l2adotl2b), &
      !$OMP PRIVATE(absl2al3b,absl2al2b,absl3al3b,absl2bl3a,DB, DSNonGauss, DSNGauss, measureG, measureNG), &
@@ -404,7 +404,6 @@ program FlatSky
 
            !get the SW bispectrum for the triplet (l1, l2 ,l3)
            !fnl = floc(l1a, l2a,l3a)
-           fnl = bispectrum(1,1,1,l2a,l3a)
 
            !Eauate the l1 and l1'
            
@@ -440,8 +439,8 @@ program FlatSky
                  phi31b = pi - phi23b - phi21b
 
                  !compute fnl^2
-                 fnlb = bispectrum(1,1,1,l2b,l3b)
-                 signsq = fnl*fnlb
+
+
 
                  !other angles; needed for 11 permutations 
                  !phi21b = angle(l1b,l2b,l3b)                
@@ -492,8 +491,37 @@ program FlatSky
                  ! endif
 
                  ! 2 * pi (from phi integral) / pi - from delta 0
+
+                 !signsq = fnl*fnlb
+
+
                  measureNG = 2*pi*dellar(i)*dellar(j)*dellar(k)*l1a*l2a*dPhia*l2b*dPhib
-                 DSNonGauss = 4.*measureNG*signsq*Sum(DB(1:1))/Cll(1,l1a)**2/Cll(1,l2a)/Cll(1,l2b)/Cll(1,l3a)/Cll(1,l3b)/(2.*pi)**4/pi
+                 tempfacFcM(:,:) = 0
+                 tempfac =  4.*measureNG*pClpp(1,l1a)*(l1adotl2b*l1dotl2a)/(2.*pi)**4/pi
+                 tempfacFcM(1,1) = tempfac
+                 if (nfields .gt. 1) then
+                   tempfacFcM(2,1) = cos(2*(phi21a+phi31a))*tempfac
+                   tempfacFcM(1,2) = cos(2*(phi21b+phi31b))*tempfac
+                   tempfacFcM(2,2) = cos(2*(phi21a+phi31a))*cos(2*(phi21b+phi31b))*tempfac
+                   !write(*,*) tempfacFcM(2,2)
+                 endif
+                 do m2  = minfields,nfields !T,E (8 terms only)
+                   do p2 = minfields,nfields !T,E
+                      do q2 = minfields,nfields !T,E
+                         do m1  = minfields,nfields !T,E (8 terms only)
+                            do p1 = minfields,nfields !T,E
+                               do q1 = minfields,nfields !T,E
+                                  DB_tmp = Cllm(m1,m2,l1a)*Cllm(p1,q1,l2a)*Cllm(p2,q2,l2b)*tempfacFcM(q1,q2)
+                                  fnl = bispectrum(m1,p1,q1,l2a,l3a)
+                                  fnlb = bispectrum(m2,p2,q2,l2b,l3b)
+                                  DSNonGauss =DSNonGauss+ fnl*fnlb*DB_tmp
+                               enddo
+                            enddo
+                        enddo
+                      enddo
+                   enddo
+                 enddo
+                 
 
                  SumNGauss =  SumNGauss + DSNonGauss
 
@@ -503,7 +531,21 @@ program FlatSky
 
            enddo !l2b
            measureG = 2*pi*dellar(i)*dellar(j)*l1a*l2a*dPhia
-           DSNGauss = 2.*measureG*fnl**2/Cll(1,l1a)/Cll(1,l2a)/Cll(1,l3a)/6./(2.*pi)**2/pi 
+           do m2  = minfields,nfields !T,E (8 terms only)
+             do p2 = minfields,nfields !T,E
+                do q2 = minfields,nfields !T,E
+                   do m1  = minfields,nfields !T,E (8 terms only)
+                      do p1 = minfields,nfields !T,E
+                         do q1 = minfields,nfields !T,E
+                             fnl = bispectrum(m1,p1,q1,l2a,l3a)
+                             fnlb = bispectrum(m2,p2,q2,l2b,l3b)
+                             DSNGauss = 2.*measureG*fnl**2*Cllm(m1,m2,l1a)*Cllm(p1,p2,l2a)*Cllm(q1,q2,l3a)/6./(2.*pi)**2/pi 
+                         enddo
+                      enddo
+                   enddo
+                enddo
+             enddo
+           enddo
            SumGauss = SumGauss + DSNGauss
            SumNGauss =  SumNGauss + DSNGauss
            SumNGaussAll =  SumNGaussAll  + DSNGauss
