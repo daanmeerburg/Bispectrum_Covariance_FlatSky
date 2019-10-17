@@ -21,11 +21,12 @@ program FlatSky
   integer :: l1, l2,l3, l2a, l3a, l2b, l3b,max_l,min_l
   integer :: l3blmin, l3blmax,l3almax,l3almin, l1a,l1b
   integer :: lmax, lmin,lmaxTmp 
-  integer :: i,j,k,m,n,m2,p2,q2,q1,p1,m1,tmpPrefac
+  integer :: i,j,k,m,n,m2,p2,q2,q1,p1,m1
   real(dl) :: phi23a, phi23b, phi31a, phi31b, phi21a, phi21b, phi2a3b, phi2b3a, phi2a2b, phi3a3b
   real(dl) :: phi21amax,phi21bmax,phi21amin,phi21bmin,dPhia,dPhib
   real(dl) :: fnl,fnlb, signsq
   real(dl) :: absl2l3a, absl2l3b, absl3al3b, absl2al2b, absl2al3b, absl2bl3a
+  real(dl) :: Rl2adotl3b,Rl2bdotl3a,Rl3adotl3b ,Rl2adotl2b,Rabsl2al2b ,Rabsl2al3b
   real(dl) :: l2dotl3a, l2dotl3b, l2adotl3b,l2bdotl3a,l3adotl3b,l2adotl2b,l1dotl2a,l1adotl2b
   real(dl) :: DB(3),DB_tmp
   real(dl) :: SumGauss, DSNGauss,  SumNGauss, DSNonGauss, SumNGaussAll, measureG, measureNG
@@ -35,7 +36,7 @@ program FlatSky
   real(dl)  :: atj(0:20000),atj2(0:20000)
   real(dl), pointer :: a3j(:,:), a3joC(:,:)
   real(dl), pointer :: bispectrum(:,:,:,:,:),bispectrum_ISWlens(:,:,:,:,:), bis(:,:),bis_ISWlens(:,:)
-  real(dl) ::  tempfac,tempfacFcM(2,2)
+  real(dl) ::  tempfac,tempfacFcM(2,2),tmpPrefac
   real(dl) ::  DetFishCV,TotSumCVISWLens,TotSumCV,TotSumCVLensCross,alpha,beta
   real(dl) ::  Det,DetISWLens,fnlISW,fnlISWb,TempCovCV,DetLensCross,detCovCV
 
@@ -49,11 +50,12 @@ program FlatSky
   character(120) :: alphabetafile, alphabetaPolfile,tensDir
 
   logical :: want_ISW_correction = .false.
+  logical :: want_all_terms = .true.
 
   shape = 1
   minfields = 1
   nfields = 1
-  want_ISW_correction = .true.
+  want_ISW_correction = .false.
 
   !various binning schemes
 !!$  do i  = 1, 256
@@ -246,7 +248,7 @@ program FlatSky
   !intmax = 60 : lmax = 100
   !intmax = 210 : lmax = 3810
   intmax = 100
-  imin = 39
+  imin = 40
   lmax = ellar(intmax)
   lmin = ellar(imin)
 
@@ -281,7 +283,7 @@ program FlatSky
       endif
     enddo
 
-    intmax= intmax 
+    intmax= intmax-1
     lmax = ellar(intmax)
     SumGauss =0.d0
     SumNGauss = 0.d0
@@ -298,12 +300,12 @@ program FlatSky
     !$OMP PRIVATE(Det,TempCovCV,atj,bis,bis_ISWlens,tmpPrefac) &
     !$OMP PRIVATE(DetISWLens,DetLensCross,fnlISW,fnl,bispectrum,bispectrum_ISWlens) &
     !$OMP REDUCTION(+:TotSumCV,TotSumCVISWLens,TotSumCVLensCross) 
-    do l1 = lmin, lmax
+    do l1 = 2, lmax
        allocate(bis(nfields**3,lmax))
        allocate(bis_ISWlens(nfields**3,lmax))
        allocate(bispectrum(nfields,nfields,nfields,1,lmax))
        allocate(bispectrum_ISWlens(nfields,nfields,nfields,1,lmax))       
-       do l2 =  max(lmin,l1), lmax
+       do l2 =  max(2,l1), lmax
           min_l = max(abs(l1-l2),l2)
           if (mod(l1+l2+min_l,2)/=0) then
              min_l = min_l+1 !l3 should only lead to parity even numbers
@@ -319,6 +321,7 @@ program FlatSky
           call GetThreeJs(atj(abs(l2-l1)),l1,l2,0,0)
           call reshapeBispectrum(bis,bispectrum,1,minfields,nfields)
           call reshapeBispectrum(bis_ISWlens,bispectrum_ISWlens,1,minfields,nfields)
+
           do l3=min_l,max_l, 2 !sum has to be even
              tmpPrefac = (atj(l3)*prefactor(l1,l2,l3)*.5)**2/tr(l1,l2,l3)
              do m2  = minfields,nfields !T,E (8 terms only)
@@ -339,7 +342,6 @@ program FlatSky
                    enddo
                 enddo
              enddo
-
           enddo !l3 loop
        enddo !l2 loop
        deallocate(bis)
@@ -419,6 +421,7 @@ program FlatSky
        !$OMP PRIVATE(l2a,l3a,l2b,l3b,phi21a,phi21b,phi21amax,phi21bmax,phi21amin,phi21bmin,j,k,m,n), &
        !$OMP PRIVATE(fnl,fnlb,fnlISW,fnlISWb,signsq,tempfac,tempfacFcM,DB_tmp), &
        !$OMP PRIVATE(p1,q1,m1,p2,q2,m2), &
+       !$OMP PRIVATE(Rl2adotl3b,Rl2bdotl3a,Rl3adotl3b ,Rl2adotl2b,Rabsl2al2b ,Rabsl2al3b), &
        !$OMP PRIVATE(phi23a,phi23b,phi31a,phi31b,phi2a3b,phi2b3a,phi2a2b,phi3a3b,nPhia,nPhib,dPhia,dPhib), &
        !$OMP PRIVATE(l1dotl2a,l1adotl2b,l2dotl3a,l2dotl3b,l2adotl3b,l2bdotl3a,l3adotl3b,l2adotl2b), &
        !$OMP PRIVATE(absl2al3b,absl2al2b,absl3al3b,absl2bl3a,DB, DSNonGauss, DSNGauss, measureG, measureNG), &
@@ -453,13 +456,13 @@ program FlatSky
                 !   write(*,*), lmin,lmax,l1a,l2a,l3a
                 cycle
              endif
-             l1dotl2a = l1a*l2a*cos(phi21a)
+             l1dotl2a = l1a*l2a*cos(pi - phi21a)
 
              if(l1dotl2a .ne. l1dotl2a) write(*,*) 'NANs'
 
              !other angles; needed for 11 permutations 
-             phi23a = angle(l2a,l3a,l1a)
-             phi31a = pi - phi23a - phi21a
+             phi31a = angle(l3a,l1a,l2a)
+             !phi31a = pi - phi23a - phi21a
 
              !get the SW bispectrum for the triplet (l1, l2 ,l3)
              !fnl = floc(l1a, l2a,l3a)
@@ -491,11 +494,11 @@ program FlatSky
                    if ((l3b .lt. lmin) .or. (l3b .gt. lmax)) then
                       cycle
                    endif
-                   l1adotl2b = l1a*l2b*cos(phi21b)
+                   l1adotl2b = l1a*l2b*cos(pi - phi21b)
                    if(l1adotl2b .ne. l1adotl2b) write(*,*) 'NANs'
                    !prime triangle angle between l2' and l3'
-                   phi23b = angle(l2b,l3b,l1b)
-                   phi31b = pi - phi23b - phi21b
+                   phi31b = angle(l3b,l1b,l2b)
+                   !phi31b = pi - phi23b - phi21b
 
                    !compute fnl^2
 
@@ -503,25 +506,39 @@ program FlatSky
 
                    !other angles; needed for 11 permutations 
                    !phi21b = angle(l1b,l2b,l3b)                
+                   if (want_all_terms) then
+                     phi2a3b =  phi21a + phi31b !correct direction
+                     phi2b3a =  phi21b + phi31a
+                     phi2a2b = phi21a - phi21b
+                     phi3a3b = phi31a - phi31b
 
-                   phi2a3b =  phi21a + phi31b !correct direction
-                   phi2b3a =  phi21b + phi31a
+                     !other inner products:
+                     l2adotl3b = l2a*l3b*cos(phi2a3b) !l2.l3'
+                     l2bdotl3a = l2b*l3a*cos(phi2b3a) !l2'.l3
 
-                   phi2a2b = phi21a - phi21b
-                   phi3a3b = phi31a - phi31b
+                     l3adotl3b = l3a*l3b*cos(phi3a3b) !l3.l3'
+                     l2adotl2b = l2a*l2b*cos(phi2a2b) !l2.l2'
 
-                   !other inner products:
-                   ! l2dotl3b = l2b*l3b*cos(phi23b) !l2'.l3'
+                     ! !other lengths:
+                     absl2al2b = nint(length(l2a,l2b,phi2a2b)) !|l2+l2'|
+                     absl2al3b = nint(length(l2a,l3b,phi2a3b)) !|l3+l3'|  
 
-                   ! l2adotl3b = l2a*l3b*cos(phi2a3b) !l2.l3'
-                   ! l2bdotl3a = l2b*l3a*cos(phi2b3a) !l2'.l3
+                     phi2a3b =  phi21a - phi31b !correct direction
+                     phi2b3a =  phi21b - phi31a
+                     phi2a2b = phi21a + phi21b
+                     phi3a3b = phi31a + phi31b
 
-                   ! l3adotl3b = l3a*l3b*cos(phi3a3b) !l3.l3'
-                   ! l2adotl2b = l2a*l2b*cos(phi2a2b) !l2.l2'
+                     !other inner products:
+                     Rl2adotl3b = l2a*l3b*cos(phi2a3b) !l2.l3'
+                     Rl2bdotl3a = l2b*l3a*cos(phi2b3a) !l2'.l3
 
-                   ! !other lengths:
-                   ! absl2al2b = nint(length(l2a,l2b,phi2a2b)) !|l2+l2'|
-                   ! absl3al3b = nint(length(l3a,l3b,phi3a3b)) !|l3+l3'|                 
+                     Rl3adotl3b = l3a*l3b*cos(phi3a3b) !l3.l3'
+                     Rl2adotl2b = l2a*l2b*cos(phi2a2b) !l2.l2'
+
+                     ! !other lengths:
+                     Rabsl2al2b = nint(length(l2a,l2b,phi2a2b)) !|l2+l2'|
+                     Rabsl2al3b = nint(length(l2a,l3b,phi2a3b)) !|l3+l3'|  
+                   endif               
 
                    ! absl2al3b = nint(length(l2a,l3b,phi2a3b)) !|l2+l3'|
                    ! absl2bl3a = nint(length(l2b,l3a,phi2b3a)) !|l2'+l3|
@@ -533,22 +550,30 @@ program FlatSky
                    !if(absl2al2b .gt. lmax) absl2al2b = lmax
   !!$                 
                    !3 unique terms 
-                   DB(1) =  Cll(1,l1a)*Cll(1,l2a)*Cll(1,l2b)*pClpp(1,l1a)* &
-                        (l1adotl2b*l1dotl2a)
-
-                   ! if(absl2bl3a .lt. lmin .or. absl2bl3a .gt. lmax) then
-                   !    DB(2) = 0.d0
-                   ! else                    
-                   !    DB(2) = ( Cll(1,l1a)*Cll(1,l2a)*Cll(1,l2b)*pClpp(1,absl2bl3a)* &
-                   !         (l2a**2-l2adotl3b)*(l2b**2-l2bdotl3a))
-                   ! endif
-                   ! if(absl2al2b .lt. lmin .or. absl2al2b .gt. lmax) then
-                   !    DB(3) = 0.d0
-                   ! else                    
-                   !    DB(3) = (Cll(1,l1a)*Cll(1,l2b)*Cll(1,l3b)*pClpp(1,absl2al2b)* &
-                   !         (l3b**2-l3adotl3b)*(l2b**2-l2adotl2b))       
-                   ! endif
-
+                   ! DB(1) =  Cll(1,l1a)*Cll(1,l2a)*Cll(1,l2b)*pClpp(1,l1a)* &
+                   !     (l1adotl2b*l1dotl2a)
+                   DB(2) = 0.d0
+                   DB(3) = 0.d0
+                   if (want_all_terms) then
+                     if(absl2al3b .gt. 40 .and. absl2al3b .lt. 4000) then                  
+                         DB(2) = ( pClpp(1,nint(absl2al3b))* &
+                              (l2a**2-l2adotl3b)*(l2b**2-l2bdotl3a))
+                    endif
+                    if(Rabsl2al3b .gt. 40 .and. Rabsl2al3b .lt. 4000) then
+                         DB(2) = DB(2)- ( pClpp(1,nint(Rabsl2al3b))* &
+                              (l2a**2-Rl2adotl3b)*(l2b**2-Rl2bdotl3a))
+                     endif
+                     if(absl2al2b .gt. 40 .and. absl2al2b .lt. 4000) then                
+                        DB(3) = 2*(pClpp(1,nint(absl2al2b))* &
+                              (l3b**2-l3adotl3b)*(l2b**2-l2adotl2b))  
+                    endif
+                    if(Rabsl2al2b .gt. 40 .and. Rabsl2al2b .lt. 4000) then
+                        DB(3) =  DB(3)-2*(pClpp(1,nint(Rabsl2al2b))* &
+                              (l3b**2-Rl3adotl3b)*(l2b**2-Rl2adotl2b))      
+                     endif
+                   endif
+                   ! write(*,*)  (l2a**2-l2adotl3b)/l2a**2,(l2b**2-l2bdotl3a)/l2b**2,(l2a**2-Rl2adotl3b)/l2a**2,(l2b**2-Rl2bdotl3a)/l2b**2,(l3b**2-l3adotl3b)/l3b**2,(l2b**2-l2adotl2b)/l2b**2,(l3b**2-Rl3adotl3b)/l3b**2,(l2b**2-Rl2adotl2b)/l2b**2
+                   ! write(*,*) nint(absl2al3b),nint(absl2al2b),pClpp(1,l1a)*(l1adotl2b*l1dotl2a), pClpp(1,nint(absl2al3b))*(l2a**2-l2adotl3b)*(l2b**2-l2bdotl3a),pClpp(1,nint(Rabsl2al3b))*(l2a**2-Rl2adotl3b)*(l2b**2-Rl2bdotl3a),pClpp(1,nint(absl2al2b))*(l3b**2-l3adotl3b)*(l2b**2-l2adotl2b),(pClpp(1,nint(Rabsl2al2b))*(l3b**2-Rl3adotl3b)*(l2b**2-Rl2adotl2b)) 
                    ! 2 * pi (from phi integral) / pi - from delta 0
 
                    !signsq = fnl*fnlb
@@ -590,8 +615,43 @@ program FlatSky
                    
 
                    SumNGauss =  SumNGauss + DSNonGauss
+                   if (want_all_terms) then
+                       measureNG = 2*pi*dellar(i)*dellar(j)*dellar(k)*l1a*l2a*dPhia*l2b*dPhib
+                       tempfacFcM(:,:) = 0
+                       tempfac =  4.*measureNG/(2.*pi)**4/pi
+                       tempfacFcM(1,1) = tempfac
+                       if (nfields .gt. 1) then
+                         tempfacFcM(2,1) = cos(2*(phi21a+phi31a))*tempfac
+                         tempfacFcM(1,2) = cos(2*(phi21b+phi31b))*tempfac
+                         tempfacFcM(2,2) = cos(2*(phi21a+phi31a))*cos(2*(phi21b+phi31b))*tempfac
+                         !write(*,*) tempfacFcM(2,2)
+                       endif
+                       DSNonGauss = 0
+                       do m2  = minfields,nfields !T,E (8 terms only)
+                         do p2 = minfields,nfields !T,E
+                            do q2 = minfields,nfields !T,E
+                               do m1  = minfields,nfields !T,E (8 terms only)
+                                  do p1 = minfields,nfields !T,E
+                                     do q1 = minfields,nfields !T,E
+                                        DB_tmp = Cllm(m1,m2,l1a)*Cllm(p1,q1,l2a)*Cllm(p2,q2,l2b)*tempfacFcM(q1,q2)*DB(2)
+                                        DB_tmp = DB_tmp + Cllm(m1,m2,l1a)*Cllm(p1,q1,l2a)*Cllm(p2,q2,l3a)*tempfacFcM(p2,q2)*DB(3)
+                                        fnl = bispectrum(m1,p1,q1,l2a,l3a)
+                                        fnlb = bispectrum(m2,p2,q2,l2b,l3b)
+                                        fnlISW = bispectrum_ISWlens(m1,p1,q1,l2a,l3a)
+                                        fnlISWb = bispectrum_ISWlens(m2,p2,q2,l2b,l3b)
 
-                   SumNGaussAll =  SumNGaussAll + DSNonGauss
+                                  !write(*,*) bispectrum(2,2,2,l2,l3),bispectrum(1,1,1,l2,l3)
+                                        signsq = ( alpha**2*fnl*fnlb &
+                                             + alpha*beta*fnl*fnlISWb + alpha*beta*fnlb*fnlISW + beta**2*fnlISW*fnlISWb)
+                                        DSNonGauss =DSNonGauss+ signsq*DB_tmp
+                                     enddo
+                                  enddo
+                              enddo
+                            enddo
+                         enddo
+                       enddo
+                       SumNGaussAll =  SumNGaussAll + DSNonGauss
+                   endif
 
                 enddo !phi12b
 
@@ -630,7 +690,7 @@ program FlatSky
        deallocate(bispectrum)
        deallocate(bis_ISWlens)
        deallocate(bispectrum_ISWlens)
-       write(*,'(I4,3E16.7)') l1a,SumNGauss/alpha,SumGauss/alpha, alpha/(SumNGauss-SumGauss+alpha)
+       write(*,'(I4,6E16.7)') l1a,SumNGauss/alpha,SumGauss/alpha, alpha/(SumNGauss-SumGauss+alpha),SumNGaussAll/alpha,(SumNGaussAll-SumGauss)/(SumNGauss-SumGauss), alpha/(SumNGaussAll-SumGauss+alpha)
 
 
       !write(*,'(A5,I4,6E18.7)') 'l1 = ', l1a, SumGauss, SumNGauss, SumNGaussAll,TotSumCV/(TotSumCV+SumNGaussAll-SumGauss), sqrt(SumGauss/SumNGauss), sqrt(SumGauss/SumNGaussAll)
@@ -695,12 +755,12 @@ contains
     !if (angle .ne. angle) angle  = 0.d0
   end function angle
 
+
   subroutine reshapeBispectrum(bis,bispectrum,l2,minfields,nfields)
     real(dl), intent(in) :: bis(:,:)
     integer, intent(in) :: nfields,minfields
     real(dl) :: bispectrum(:,:,:,:,:)
     integer ::  l2
-    !(*,*),l2,minfields,nfields
     if (nfields .eq. 1) then
        bispectrum(1,1,1,l2,:) = bis(1,:)
     elseif (minfields .eq. 2) then
@@ -718,7 +778,7 @@ contains
   end subroutine reshapeBispectrum
 
   subroutine permuteBis(bispectrum,minfields,nfields,l2,l3)
-    real(dl), intent(out) :: bispectrum(:,:,:,:,:)
+    real(dl)  bispectrum(:,:,:,:,:)
     integer l2,l3,nfields,minfields
     if (nfields .eq. 1) then
        bispectrum(1,1,1,l3,l2) = bispectrum(1,1,1,l2,l3)
@@ -751,13 +811,13 @@ contains
                 do q1 = minfields,nfields
                    do q2 = minfields,nfields
                       tmpBis(q1,p1,m1) = tmpBis(q1,p1,m1) +invCl(q1,q2,l1)*invCl(p1,p2,l2)*invCl(m1,m2,l3)*bispectrum(q2,p2,m2,l2,l3)
-                   enddo
+                  enddo
                 enddo
              enddo
           enddo
        enddo
     enddo
-    bispectrum(:,:,:,l2,l3) =tmpBis(:,:,:)
+    bispectrum(:,:,:,l2,l3) = tmpBis(:,:,:)
   end subroutine applyInvC
 
   subroutine allocate_besseltransforms(P,alphabetafile,alphabetaPolfile,Cllfile,pClfile)
