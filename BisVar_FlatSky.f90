@@ -555,19 +555,19 @@ program FlatSky
                    DB(2) = 0.d0
                    DB(3) = 0.d0
                    if (want_all_terms) then
-                     if(absl2al3b .gt. lmin .and. absl2al3b .lt. 4000) then                  
+                     if(absl2al3b .gt. 2 .and. absl2al3b .lt. 4000) then                  
                          DB(2) = ( pClpp(1,nint(absl2al3b))* &
                               (l2a**2-l2adotl3b)*(l2b**2-l2bdotl3a))
                     endif
-                    if(Rabsl2al3b .gt. lmin .and. Rabsl2al3b .lt. 4000) then
+                    if(Rabsl2al3b .gt. 2 .and. Rabsl2al3b .lt. 4000) then
                          DB(2) = DB(2)+ ( pClpp(1,nint(Rabsl2al3b))* &
                               (l2a**2-Rl2adotl3b)*(l2b**2-Rl2bdotl3a))
                      endif
-                     if(absl2al2b .gt. lmin .and. absl2al2b .lt. 4000) then                
+                     if(absl2al2b .gt. 2 .and. absl2al2b .lt. 4000) then                
                         DB(3) = (pClpp(1,nint(absl2al2b))* &
                               (l3b**2-l3adotl3b)*(l2b**2-l2adotl2b))  
                     endif
-                    if(Rabsl2al2b .gt. lmin .and. Rabsl2al2b .lt. 4000) then
+                    if(Rabsl2al2b .gt. 2 .and. Rabsl2al2b .lt. 4000) then
                         DB(3) =  DB(3)+(pClpp(1,nint(Rabsl2al2b))* &
                               (l3b**2-Rl3adotl3b)*(l2b**2-Rl2adotl2b))      
                      endif
