@@ -438,11 +438,11 @@ program FlatSky
 
           !phi21amin = -pi
           phi21amin = 0.d0
-  !!$        if (abs(l2a-l1a) .gt. lmin) then
-  !!$           phi21amin = 0.d0
-  !!$        else
-  !!$           phi21amin = angle(l1a,l2a,lmin)
-  !!$        endif
+          if (abs(l2a-l1a) .gt. lmin) then
+             phi21amin = 0.d0
+          else
+             phi21amin = angle(l1a,l2a,lmin)
+          endif
           phi21amax = pi
 
           !deltaphi
@@ -478,11 +478,11 @@ program FlatSky
 
                 !phi21bmin = -pi
                 phi21bmin = 0.d0
-  !!$              if (abs(l2b-l1b) .gt. lmin) then
-  !!$                 phi21bmin = 0
-  !!$              else
-  !!$                 phi21bmin = angle(l1b,l2b,lmin)
-  !!$              endif
+                if (abs(l2b-l1b) .gt. lmin) then
+                   phi21bmin = 0
+                else
+                   phi21bmin = angle(l1b,l2b,lmin)
+                endif
                 phi21bmax = pi
                 
                 dPhib = (phi21bmax-phi21bmin)/nPhib
@@ -555,23 +555,25 @@ program FlatSky
                    DB(2) = 0.d0
                    DB(3) = 0.d0
                    if (want_all_terms) then
-                     if(absl2al3b .gt. 40 .and. absl2al3b .lt. 4000) then                  
+                     if(absl2al3b .gt. lmin .and. absl2al3b .lt. 4000) then                  
                          DB(2) = ( pClpp(1,nint(absl2al3b))* &
                               (l2a**2-l2adotl3b)*(l2b**2-l2bdotl3a))
                     endif
-                    if(Rabsl2al3b .gt. 40 .and. Rabsl2al3b .lt. 4000) then
-                         DB(2) = DB(2)- ( pClpp(1,nint(Rabsl2al3b))* &
+                    if(Rabsl2al3b .gt. lmin .and. Rabsl2al3b .lt. 4000) then
+                         DB(2) = DB(2)+ ( pClpp(1,nint(Rabsl2al3b))* &
                               (l2a**2-Rl2adotl3b)*(l2b**2-Rl2bdotl3a))
                      endif
-                     if(absl2al2b .gt. 40 .and. absl2al2b .lt. 4000) then                
-                        DB(3) = 2*(pClpp(1,nint(absl2al2b))* &
+                     if(absl2al2b .gt. lmin .and. absl2al2b .lt. 4000) then                
+                        DB(3) = (pClpp(1,nint(absl2al2b))* &
                               (l3b**2-l3adotl3b)*(l2b**2-l2adotl2b))  
                     endif
-                    if(Rabsl2al2b .gt. 40 .and. Rabsl2al2b .lt. 4000) then
-                        DB(3) =  DB(3)-2*(pClpp(1,nint(Rabsl2al2b))* &
+                    if(Rabsl2al2b .gt. lmin .and. Rabsl2al2b .lt. 4000) then
+                        DB(3) =  DB(3)+(pClpp(1,nint(Rabsl2al2b))* &
                               (l3b**2-Rl3adotl3b)*(l2b**2-Rl2adotl2b))      
                      endif
                    endif
+                   ! DB(2) = 0.d0
+                   ! DB(3) = -DB(3)
                    ! write(*,*)  (l2a**2-l2adotl3b)/l2a**2,(l2b**2-l2bdotl3a)/l2b**2,(l2a**2-Rl2adotl3b)/l2a**2,(l2b**2-Rl2bdotl3a)/l2b**2,(l3b**2-l3adotl3b)/l3b**2,(l2b**2-l2adotl2b)/l2b**2,(l3b**2-Rl3adotl3b)/l3b**2,(l2b**2-Rl2adotl2b)/l2b**2
                    ! write(*,*) nint(absl2al3b),nint(absl2al2b),pClpp(1,l1a)*(l1adotl2b*l1dotl2a), pClpp(1,nint(absl2al3b))*(l2a**2-l2adotl3b)*(l2b**2-l2bdotl3a),pClpp(1,nint(Rabsl2al3b))*(l2a**2-Rl2adotl3b)*(l2b**2-Rl2bdotl3a),pClpp(1,nint(absl2al2b))*(l3b**2-l3adotl3b)*(l2b**2-l2adotl2b),(pClpp(1,nint(Rabsl2al2b))*(l3b**2-Rl3adotl3b)*(l2b**2-Rl2adotl2b)) 
                    ! 2 * pi (from phi integral) / pi - from delta 0
@@ -618,7 +620,7 @@ program FlatSky
                    if (want_all_terms) then
                        measureNG = 2*pi*dellar(i)*dellar(j)*dellar(k)*l1a*l2a*dPhia*l2b*dPhib
                        tempfacFcM(:,:) = 0
-                       tempfac =  4.*measureNG/(2.*pi)**4/pi
+                       tempfac =  2*measureNG/(2.*pi)**4/pi
                        tempfacFcM(1,1) = tempfac
                        if (nfields .gt. 1) then
                          tempfacFcM(2,1) = cos(2*(phi21a+phi31a))*tempfac
