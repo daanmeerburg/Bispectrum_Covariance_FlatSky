@@ -43,7 +43,7 @@ program FlatSky
   type(bfs) :: P_ISWlens
   integer :: ellar(2048), dellar(2048), elltoi(5000)
   integer :: intmax, imin,nPhib,nPhia,nPhi
-  integer :: stp
+  integer :: stp, TMP
 
   integer ::  shape,nfields,minfields
   character(120) :: alphabetafile, alphabetaPolfile,tensDir
@@ -52,7 +52,7 @@ program FlatSky
 
   shape = 1
   minfields = 1
-  nfields = 1
+  nfields = 2
 
 
   !various binning schemes
@@ -117,17 +117,22 @@ program FlatSky
 !!$     endif
 !!$  enddo 
 !!$  stop
-  
+
   lmax = 5000
 
   lmin = 2
 
-  allocate(Cl(4,2:lmax))
-  allocate(Cll(4,2:lmax))
-  allocate(invCll(2,2,2:lmax))
-  allocate(Cllm(2,2,2:lmax))
-  allocate(pClpp(3,2:lmax))
-
+  allocate(Cl(4,lmax))
+  Cl(:,:) = 0.d0
+  allocate(Cll(4,lmax))
+  Cll(:,:) = 0.d0
+  allocate(invCll(2,2,lmax))
+  invCll(:,:,:) = 0.d0
+  allocate(Cllm(2,2,lmax))
+  Cllm(:,:,:) = 0.d0
+  allocate(pClpp(3,lmax))
+  pClpp(:,:) = 0.d0
+  
   Folder1 = './SOspectra/'
   Clfile = trim(Folder1)//trim('SOspectra_lenspotentialCls.dat')
   Cllfile = trim(Folder1)//trim('SOspectra_lensedCls.dat')
@@ -198,6 +203,7 @@ program FlatSky
         invCll(2,2,j) = Cll(1,j)/detCovCV
      endif
 
+     
      Cllm(1,1,j) = Cll(1,j)!/detCovCV
      Cllm(1,2,j) = Cll(4,j)!/detCovCV
      Cllm(2,1,j) = Cll(4,j)!/detCovCV
@@ -213,12 +219,12 @@ program FlatSky
   DB = 0.d0
   !structure
   !l2/l3/l3/l2'/l3'
-  lmax = 200
+  lmax = 100
   lmin = 2
 
   !intmax = 60 : lmax = 100
   !intmax = 210 : lmax = 3810
-  intmax = 115
+  intmax = 186
   imin = 39
   lmax = ellar(intmax)
   lmin = ellar(imin)
@@ -307,8 +313,8 @@ program FlatSky
 
 
   do i = imin, intmax !l2 loop
-     !do i = 2, 20   
      l1a = ellar(i)
+     !Eauate the l1 and l1'
      l1b = l1a
 
      allocate(bispectrum(nfields,nfields,nfields,lmax,lmax))
@@ -366,25 +372,13 @@ program FlatSky
      !$OMP PRIVATE(absl2al3b,absl2al2b,absl3al3b,absl2bl3a,DB, DSNonGauss, DSNGauss, measureG, measureNG), &
      !$OMP REDUCTION(+:SumGauss,SumNGauss,SumNGaussAll)
      do j = imin, intmax !l3 loop
-        !do l3a = lmin, lmax   
         l2a = ellar(j)
-        !set minimum and max values of third leg (triangle constraint)
-        !l3almax = min(l2a+l1a,lmax)
-        !l3almin = max(abs(l2a-l1a),lmin)
-
         !number of steps
         nPhia = nPhi!min(l3almax-l3almin,nPhi)
 
-        !phi21amin = -pi
         phi21amin = 0.d0
-!!$        if (abs(l2a-l1a) .gt. lmin) then
-!!$           phi21amin = 0.d0
-!!$        else
-!!$           phi21amin = angle(l1a,l2a,lmin)
-!!$        endif
         phi21amax = pi
 
-        !deltaphi
         dPhia = (phi21amax-phi21amin)/nPhia
 
         do m = 0, max(nPhia,0) !phi21a loop
@@ -406,8 +400,6 @@ program FlatSky
            !get the SW bispectrum for the triplet (l1, l2 ,l3)
            !fnl = floc(l1a, l2a,l3a)
 
-           !Eauate the l1 and l1'
-           
 
            do k = imin, intmax
 
@@ -415,17 +407,11 @@ program FlatSky
 
               nPhib = nPhi
 
-              !phi21bmin = -pi
               phi21bmin = 0.d0
-!!$              if (abs(l2b-l1b) .gt. lmin) then
-!!$                 phi21bmin = 0
-!!$              else
-!!$                 phi21bmin = angle(l1b,l2b,lmin)
-!!$              endif
               phi21bmax = pi
-              
+             
               dPhib = (phi21bmax-phi21bmin)/nPhib
-!!$              
+              
               do n = 0, max(nPhib,0)
 
                  phi21b = dPhib*n+phi21bmin
@@ -473,7 +459,7 @@ program FlatSky
 
                  !if(absl2bl3a .gt. lmax) absl2bl3a = lmax
                  !if(absl2al2b .gt. lmax) absl2al2b = lmax
-!!$                 
+!!$
                  !3 unique terms 
                  DB(1) =  Cll(1,l1a)*Cll(1,l2a)*Cll(1,l2b)*pClpp(1,l1a)* &
                       (l1adotl2b*l1dotl2a)
@@ -506,7 +492,7 @@ program FlatSky
                    tempfacFcM(2,2) = cos(2*(phi21a+phi31a))*cos(2*(phi21b+phi31b))*tempfac
                    !write(*,*) tempfacFcM(2,2)
                  endif
-                 DSNonGauss = 0
+                 DSNonGauss = 0.d0
                  do m2  = minfields,nfields !T,E (8 terms only)
                    do p2 = minfields,nfields !T,E
                       do q2 = minfields,nfields !T,E
@@ -532,28 +518,29 @@ program FlatSky
               enddo !phi12b
 
            enddo !l2b
-           DSNGauss = 0
+           DSNGauss = 0.d0
            measureG = 2*pi*dellar(i)*dellar(j)*l1a*l2a*dPhia
            do m2  = minfields,nfields !T,E (8 terms only)
-             do p2 = minfields,nfields !T,E
-                do q2 = minfields,nfields !T,E
-                   do m1  = minfields,nfields !T,E (8 terms only)
-                      do p1 = minfields,nfields !T,E
-                         do q1 = minfields,nfields !T,E
+              do p2 = minfields,nfields !T,E
+                 do q2 = minfields,nfields !T,E
+                    do m1  = minfields,nfields !T,E (8 terms only)
+                       do p1 = minfields,nfields !T,E
+                          do q1 = minfields,nfields !T,E
                              fnl = bispectrum(m1,p1,q1,l2a,l3a)
-                             fnlb = bispectrum(m2,p2,q2,l2b,l3b)
+                             fnlb = bispectrum(m2,p2,q2,l2a,l3a)
                              DSNGauss = DSNGauss + 2.*measureG*fnl*fnlb*Cllm(m1,m2,l1a)*Cllm(p1,p2,l2a)*Cllm(q1,q2,l3a)/6./(2.*pi)**2/pi 
-                         enddo
-                      enddo
-                   enddo
-                enddo
-             enddo
+                          enddo
+                       enddo
+                    enddo
+                 enddo
+              enddo
            enddo
+
            SumGauss = SumGauss + DSNGauss
            SumNGauss =  SumNGauss + DSNGauss
            SumNGaussAll =  SumNGaussAll  + DSNGauss
         enddo !phi12a
-     enddo !l3a
+     enddo !l2a
      !$OMP END PARAllEl DO
 
      deallocate(bis)
@@ -636,21 +623,22 @@ contains
     endif
   end subroutine permuteBis
 
-  subroutine applyInvC(bispectrum,invCl,minfields,nfields,l1,l2,l3)
+  subroutine applyInvC(bispectrum,invCll,minfields,nfields,l1,l2,l3)
     real(dl), intent(inout) :: bispectrum(:,:,:,:,:)
-    real(dl), intent(in):: invCl(:,:,:)
+    real(dl), intent(in):: invCll(:,:,:)
     integer, intent(in):: nfields,minfields
     integer, intent(in) :: l1,l2,l3
     integer :: m1,m2,p1,p2,q1,q2
     real(dl) :: tmpBis(nfields,nfields,nfields)
-    tmpBis(:,:,:) = 0
+    tmpBis(:,:,:) = 0.d0
     do m1 = minfields,nfields
        do m2 = minfields,nfields
           do p1 = minfields,nfields
              do p2 = minfields,nfields
                 do q1 = minfields,nfields
                    do q2 = minfields,nfields
-                      tmpBis(q1,p1,m1) = tmpBis(q1,p1,m1) +invCl(q1,q2,l1)*invCl(p1,p2,l2)*invCl(m1,m2,l3)*bispectrum(q2,p2,m2,l2,l3)
+                      tmpBis(q1,p1,m1) = tmpBis(q1,p1,m1) + invCll(q1,q2,l1)*invCll(p1,p2,l2)*invCll(m1,m2,l3) &
+                           *bispectrum(q2,p2,m2,l2,l3)
                    enddo
                 enddo
              enddo
